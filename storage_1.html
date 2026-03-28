@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Storage and Indexes — Computing Hardware – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction-database-implementation" id="toc-introduction-database-implementation" class="nav-link active" data-scroll-target="#introduction-database-implementation">1. Introduction: Database Implementation</a></li>
+  <li><a href="#why-hardware-matters-for-databases" id="toc-why-hardware-matters-for-databases" class="nav-link" data-scroll-target="#why-hardware-matters-for-databases">2. Why Hardware Matters for Databases</a></li>
+  <li><a href="#storage-hierarchy" id="toc-storage-hierarchy" class="nav-link" data-scroll-target="#storage-hierarchy">3. Storage Hierarchy</a>
+  <ul class="collapse">
+  <li><a href="#overview" id="toc-overview" class="nav-link" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#volatile-vs-non-volatile-storage" id="toc-volatile-vs-non-volatile-storage" class="nav-link" data-scroll-target="#volatile-vs-non-volatile-storage">Volatile vs Non-Volatile Storage</a></li>
+  </ul></li>
+  <li><a href="#orders-of-magnitude-why-this-matters" id="toc-orders-of-magnitude-why-this-matters" class="nav-link" data-scroll-target="#orders-of-magnitude-why-this-matters">4. Orders of Magnitude: Why This Matters</a></li>
+  <li><a href="#cpu-architecture-and-caches" id="toc-cpu-architecture-and-caches" class="nav-link" data-scroll-target="#cpu-architecture-and-caches">5. CPU Architecture and Caches</a>
+  <ul class="collapse">
+  <li><a href="#modern-multi-core-cpus" id="toc-modern-multi-core-cpus" class="nav-link" data-scroll-target="#modern-multi-core-cpus">Modern Multi-Core CPUs</a></li>
+  <li><a href="#cache-hierarchy" id="toc-cache-hierarchy" class="nav-link" data-scroll-target="#cache-hierarchy">Cache Hierarchy</a></li>
+  <li><a href="#why-caches-matter-for-databases" id="toc-why-caches-matter-for-databases" class="nav-link" data-scroll-target="#why-caches-matter-for-databases">Why Caches Matter for Databases</a></li>
+  </ul></li>
+  <li><a href="#physical-vs-virtual-memory" id="toc-physical-vs-virtual-memory" class="nav-link" data-scroll-target="#physical-vs-virtual-memory">6. Physical vs Virtual Memory</a></li>
+  <li><a href="#hard-disk-drives-hdds" id="toc-hard-disk-drives-hdds" class="nav-link" data-scroll-target="#hard-disk-drives-hdds">7. Hard Disk Drives (HDDs)</a>
+  <ul class="collapse">
+  <li><a href="#structure" id="toc-structure" class="nav-link" data-scroll-target="#structure">Structure</a></li>
+  <li><a href="#disk-access-cost" id="toc-disk-access-cost" class="nav-link" data-scroll-target="#disk-access-cost">Disk Access Cost</a></li>
+  <li><a href="#random-vs-sequential-access" id="toc-random-vs-sequential-access" class="nav-link" data-scroll-target="#random-vs-sequential-access">Random vs Sequential Access</a></li>
+  <li><a href="#worked-example" id="toc-worked-example" class="nav-link" data-scroll-target="#worked-example">Worked Example</a></li>
+  <li><a href="#reliability" id="toc-reliability" class="nav-link" data-scroll-target="#reliability">Reliability</a></li>
+  <li><a href="#a-note-on-track-geometry" id="toc-a-note-on-track-geometry" class="nav-link" data-scroll-target="#a-note-on-track-geometry">A Note on Track Geometry</a></li>
+  </ul></li>
+  <li><a href="#solid-state-drives-ssds" id="toc-solid-state-drives-ssds" class="nav-link" data-scroll-target="#solid-state-drives-ssds">8. Solid State Drives (SSDs)</a>
+  <ul class="collapse">
+  <li><a href="#advantages" id="toc-advantages" class="nav-link" data-scroll-target="#advantages">Advantages</a></li>
+  <li><a href="#write-complexity" id="toc-write-complexity" class="nav-link" data-scroll-target="#write-complexity">Write Complexity</a></li>
+  <li><a href="#wear-leveling-and-the-flash-translation-layer" id="toc-wear-leveling-and-the-flash-translation-layer" class="nav-link" data-scroll-target="#wear-leveling-and-the-flash-translation-layer">Wear Leveling and the Flash Translation Layer</a></li>
+  <li><a href="#cost" id="toc-cost" class="nav-link" data-scroll-target="#cost">Cost</a></li>
+  </ul></li>
+  <li><a href="#evolution-of-hardware-and-its-impact-on-database-design" id="toc-evolution-of-hardware-and-its-impact-on-database-design" class="nav-link" data-scroll-target="#evolution-of-hardware-and-its-impact-on-database-design">9. Evolution of Hardware and Its Impact on Database Design</a>
+  <ul class="collapse">
+  <li><a href="#the-old-world" id="toc-the-old-world" class="nav-link" data-scroll-target="#the-old-world">The Old World</a></li>
+  <li><a href="#tertiary-storage" id="toc-tertiary-storage" class="nav-link" data-scroll-target="#tertiary-storage">Tertiary Storage</a></li>
+  <li><a href="#the-modern-world" id="toc-the-modern-world" class="nav-link" data-scroll-target="#the-modern-world">The Modern World</a></li>
+  </ul></li>
+  <li><a href="#multi-core-cpus-and-parallelism" id="toc-multi-core-cpus-and-parallelism" class="nav-link" data-scroll-target="#multi-core-cpus-and-parallelism">10. Multi-Core CPUs and Parallelism</a>
+  <ul class="collapse">
+  <li><a href="#moores-law" id="toc-moores-law" class="nav-link" data-scroll-target="#moores-law">Moore’s Law</a></li>
+  <li><a href="#the-shift-to-multi-core" id="toc-the-shift-to-multi-core" class="nav-link" data-scroll-target="#the-shift-to-multi-core">The Shift to Multi-Core</a></li>
+  <li><a href="#graphics-processing-units-gpus" id="toc-graphics-processing-units-gpus" class="nav-link" data-scroll-target="#graphics-processing-units-gpus">Graphics Processing Units (GPUs)</a></li>
+  </ul></li>
+  <li><a href="#networks" id="toc-networks" class="nav-link" data-scroll-target="#networks">11. Networks</a></li>
+  <li><a href="#parallel-architectures" id="toc-parallel-architectures" class="nav-link" data-scroll-target="#parallel-architectures">12. Parallel Architectures</a></li>
+  <li><a href="#modern-database-architectures-and-key-takeaways" id="toc-modern-database-architectures-and-key-takeaways" class="nav-link" data-scroll-target="#modern-database-architectures-and-key-takeaways">13. Modern Database Architectures and Key Takeaways</a>
+  <ul class="collapse">
+  <li><a href="#then-and-now" id="toc-then-and-now" class="nav-link" data-scroll-target="#then-and-now">Then and Now</a></li>
+  <li><a href="#data-center-scale" id="toc-data-center-scale" class="nav-link" data-scroll-target="#data-center-scale">Data Center Scale</a></li>
+  <li><a href="#key-takeaways" id="toc-key-takeaways" class="nav-link" data-scroll-target="#key-takeaways">Key Takeaways</a></li>
+  </ul></li>
+  <li><a href="#looking-ahead" id="toc-looking-ahead" class="nav-link" data-scroll-target="#looking-ahead">14. Looking Ahead</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Storage and Indexes — Computing Hardware</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction-database-implementation" class="level2">
+<h2 class="anchored" data-anchor-id="introduction-database-implementation">1. Introduction: Database Implementation</h2>
+<p>Up to this point in the course, we have focused on <strong>logical database design</strong> — schemas, relational algebra, and SQL. We now shift our attention to the <strong>internal implementation of a DBMS</strong>: how data is physically stored, how queries are executed efficiently, and how correctness is ensured through transactions.</p>
+<p>The topics we will cover in this module include:</p>
+<ul>
+<li><strong>Storage devices</strong> (RAM, disks, SSDs) and their characteristics — the focus of this set of notes</li>
+<li><strong>Tuple and file organization</strong> — how tuples and their attributes are laid out on disk blocks and memory pages</li>
+<li><strong>Indexes</strong> (B+ trees, hash indexes, LSM trees) — data structures for efficiently finding specific tuples</li>
+<li><strong>Query processing and optimization</strong> — how relational operations are executed and how the best execution plan is chosen</li>
+<li><strong>Transactions and concurrency</strong> — how the ACID properties are supported</li>
+</ul>
+<p>The focus of this first set of notes is on <strong>computing hardware and the storage hierarchy</strong>, which strongly influence how database systems are designed and where performance bottlenecks arise.</p>
+<hr>
+</section>
+<section id="why-hardware-matters-for-databases" class="level2">
+<h2 class="anchored" data-anchor-id="why-hardware-matters-for-databases">2. Why Hardware Matters for Databases</h2>
+<p>Database systems are fundamentally about two things: <strong>moving data</strong> and <strong>processing data</strong>. As a result, performance is dominated not just by algorithms, but by the characteristics of the underlying hardware — memory speed versus disk speed, sequential versus random access patterns, CPU parallelism, and network latency.</p>
+<p>The gap between different levels of the storage hierarchy is enormous. Data sitting in a CPU cache can be accessed in nanoseconds, while data on a hard disk can take milliseconds to retrieve — a difference of six orders of magnitude. This gap matters a great deal when trying to extract the best performance out of a system. It is partly why we continue to see new database systems being developed: older systems like PostgreSQL were not designed to utilize CPU caches most effectively, and as hardware has evolved, new designs can exploit these characteristics much better.</p>
+<p>Historically, databases operated under the assumption that data was large and memory was small, so disk I/O dominated everything. Today, memory is large (routinely measured in terabytes for servers), SSDs have replaced hard disks for most workloads, networks within data centers are extremely fast, and CPUs are multi-core. This shift has fundamentally changed how database systems are designed, and it continues to drive innovation in the field.</p>
+<hr>
+</section>
+<section id="storage-hierarchy" class="level2">
+<h2 class="anchored" data-anchor-id="storage-hierarchy">3. Storage Hierarchy</h2>
+<section id="overview" class="level3">
+<h3 class="anchored" data-anchor-id="overview">Overview</h3>
+<p>The storage hierarchy in a modern computer system consists of multiple layers, arranged from fastest-and-smallest at the top to slowest-and-largest at the bottom.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/storage_hierarchy_pyramid.png" class="img-fluid figure-img"></p>
+<figcaption>Storage hierarchy pyramid</figcaption>
+</figure>
+</div>
+<p>At the very top are <strong>CPU registers</strong>, which are the fastest storage available but hold only a tiny amount of data. Below that are <strong>caches</strong> (L1, L2, and L3), which are built into or near the CPU and provide very fast access to recently used data. <strong>Main memory (RAM)</strong> comes next — it is substantially larger than cache but slower to access. Below main memory sits <strong>secondary storage</strong> — hard disk drives (HDDs) or solid-state drives (SSDs) — which is non-volatile but much slower. Finally, <strong>tertiary storage</strong> such as tape drives and optical media provides the cheapest per-byte storage for archival purposes, at the cost of very high access latency.</p>
+<p>As we move down the hierarchy, three things happen: capacity increases, cost per byte decreases, and access latency increases. Understanding these trade-offs is essential for database system design, because the system must carefully manage which data resides at which level in order to achieve good performance.</p>
+</section>
+<section id="volatile-vs-non-volatile-storage" class="level3">
+<h3 class="anchored" data-anchor-id="volatile-vs-non-volatile-storage">Volatile vs Non-Volatile Storage</h3>
+<p>An important distinction in the hierarchy is between <strong>volatile</strong> and <strong>non-volatile</strong> storage. Volatile memory — including registers, caches, and RAM — loses its contents when power is removed. Non-volatile storage — including SSDs, HDDs, and tapes — retains data even without power.</p>
+<p>Database systems rely heavily on both: RAM provides the performance needed for active query processing, while disk or SSD storage provides the durability guarantees that databases require. A significant portion of database system design is concerned with managing the movement of data between these two categories of storage efficiently and correctly.</p>
+<hr>
+</section>
+</section>
+<section id="orders-of-magnitude-why-this-matters" class="level2">
+<h2 class="anchored" data-anchor-id="orders-of-magnitude-why-this-matters">4. Orders of Magnitude: Why This Matters</h2>
+<p>To appreciate why the storage hierarchy matters so much, consider the following table of approximate access times. The “relative access time” column scales these numbers as if an L1 cache access took the time of a blink of an eye.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Storage type</th>
+<th>Access time</th>
+<th>Relative access time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>L1 cache</td>
+<td>0.5 ns</td>
+<td>Blink of an eye</td>
+</tr>
+<tr class="even">
+<td>L2 cache</td>
+<td>7 ns</td>
+<td>4 seconds</td>
+</tr>
+<tr class="odd">
+<td>1 MB from RAM</td>
+<td>0.25 ms</td>
+<td>5 days</td>
+</tr>
+<tr class="even">
+<td>1 MB from SSD</td>
+<td>1 ms</td>
+<td>23 days</td>
+</tr>
+<tr class="odd">
+<td>HDD seek</td>
+<td>10 ms</td>
+<td>231 days</td>
+</tr>
+<tr class="even">
+<td>1 MB from HDD</td>
+<td>20 ms</td>
+<td>1.25 years</td>
+</tr>
+</tbody>
+</table>
+<p>The key takeaway is that the gap between cache and disk is not just large — it is <strong>six orders of magnitude</strong>. Between nanoseconds and milliseconds, there are also microseconds, so the full span from L1 cache to disk access covers a factor of roughly one million. For a CPU, waiting 10-20 milliseconds to retrieve a single integer from disk is an eternity.</p>
+<p>This is precisely why database systems invest heavily in <strong>buffering</strong> (keeping frequently accessed data in memory), why <strong>sequential access patterns</strong> are strongly preferred over random access, and why <strong>indexes</strong> are used to minimize the number of disk accesses needed to answer a query.</p>
+<hr>
+</section>
+<section id="cpu-architecture-and-caches" class="level2">
+<h2 class="anchored" data-anchor-id="cpu-architecture-and-caches">5. CPU Architecture and Caches</h2>
+<section id="modern-multi-core-cpus" class="level3">
+<h3 class="anchored" data-anchor-id="modern-multi-core-cpus">Modern Multi-Core CPUs</h3>
+<p>Modern CPUs contain multiple processing cores, each capable of executing instructions independently. The figure below shows the die layout of an AMD Ryzen processor with eight cores, shared L3 caches, DDR4 memory channels, and interconnects.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/amd_ryzen_die.png" class="img-fluid figure-img"></p>
+<figcaption>AMD Ryzen CPU Architecture</figcaption>
+</figure>
+</div>
+</section>
+<section id="cache-hierarchy" class="level3">
+<h3 class="anchored" data-anchor-id="cache-hierarchy">Cache Hierarchy</h3>
+<p>Between the CPU cores and main memory sits a hierarchy of caches that serve as high-speed buffers for recently accessed data.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/cache_diagram.png" class="img-fluid figure-img"></p>
+<figcaption>Cache and RAM diagram</figcaption>
+</figure>
+</div>
+<p>The <strong>L1 cache</strong> is the smallest and fastest, typically private to each core. The <strong>L2 cache</strong> is larger and slightly slower, and the <strong>L3 cache</strong> is shared across multiple cores and larger still. When a CPU core needs to read a particular byte of data, it first checks L1, then L2, then L3, and only if the data is not found in any cache does it go to main memory.</p>
+</section>
+<section id="why-caches-matter-for-databases" class="level3">
+<h3 class="anchored" data-anchor-id="why-caches-matter-for-databases">Why Caches Matter for Databases</h3>
+<p>Accessing main memory has become relatively slow compared to CPU speeds, so caches play a critical role in overall system performance. Algorithms that exhibit <strong>locality of reference</strong> — meaning they tend to access the same data repeatedly (temporal locality) or access data that is near previously accessed data (spatial locality) — perform much better because their working set stays in cache.</p>
+<p>For database operations, a sequential scan through a table is cache-friendly because it accesses memory locations in order, allowing the hardware prefetcher to bring data into cache before it is needed. In contrast, random access patterns — such as following pointers scattered across memory — cause frequent cache misses and are much slower. This distinction between cache-friendly and cache-unfriendly access patterns is one reason why some database designs dramatically outperform others on the same hardware.</p>
+<hr>
+</section>
+</section>
+<section id="physical-vs-virtual-memory" class="level2">
+<h2 class="anchored" data-anchor-id="physical-vs-virtual-memory">6. Physical vs Virtual Memory</h2>
+<p><strong>Physical memory</strong> refers to the actual RAM hardware installed in a computer. <strong>Virtual memory</strong> is an abstraction provided by the operating system that gives each running process the illusion of having a large, contiguous block of memory all to itself.</p>
+<p>Virtual memory works through a mechanism called <strong>paging</strong>: the virtual address space is divided into fixed-size pages, and the operating system maintains a mapping from virtual pages to physical memory frames. When a process accesses a virtual address, the hardware translates it to the corresponding physical address. If the data is not currently in physical memory — because there is not enough RAM to hold everything — the operating system <strong>swaps</strong> it to disk and brings it back when needed. From the program’s perspective, the data appears to be in the same virtual location regardless of whether it is currently in physical RAM or has been temporarily moved to disk.</p>
+<p>This matters for databases because relying on the operating system’s virtual memory paging can lead to <strong>unpredictable performance</strong> — the OS may swap out database pages at inopportune times, causing unexpected disk accesses. For this reason, many database systems manage their own memory explicitly through a component called a <strong>buffer manager</strong>, rather than relying on the operating system’s paging mechanism. The buffer manager decides which disk blocks to keep in memory and which to evict, using policies specifically tuned for database workloads.</p>
+<hr>
+</section>
+<section id="hard-disk-drives-hdds" class="level2">
+<h2 class="anchored" data-anchor-id="hard-disk-drives-hdds">7. Hard Disk Drives (HDDs)</h2>
+<section id="structure" class="level3">
+<h3 class="anchored" data-anchor-id="structure">Structure</h3>
+<p>Hard disk drives, also known as magnetic disks, were the primary non-volatile storage mechanism for databases for several decades. Although they have been largely supplanted by solid-state drives for most database workloads, understanding how they work is important because many algorithms and design decisions in database systems were originally motivated by the characteristics of hard disks.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/hdd_platter_diagram.png" class="img-fluid figure-img"></p>
+<figcaption>HDD platter diagram</figcaption>
+</figure>
+</div>
+<p>A hard disk consists of one or more <strong>platters</strong> — circular disks coated with magnetic material — that spin at high speeds (typically 5,400 to 15,000 revolutions per minute). Each platter surface is organized into concentric <strong>tracks</strong>, and each track is divided into small <strong>sectors</strong> of typically 512 bytes — the smallest unit that can be read from or written to the disk. A <strong>read/write head</strong> mounted on a movable <strong>arm assembly</strong> floats just above the platter surface. To read data from a specific location, the arm must move the head to the correct track and then wait for the desired sector to rotate under the head.</p>
+</section>
+<section id="disk-access-cost" class="level3">
+<h3 class="anchored" data-anchor-id="disk-access-cost">Disk Access Cost</h3>
+<p>Accessing a particular data item on a hard disk involves three components of delay:</p>
+<ol type="1">
+<li><p><strong>Seek time</strong>: The time required to move the arm to the correct track. This is a physical movement — the arm must be lifted, repositioned, and set down. This takes on average 4 to 10 milliseconds, and we are essentially at the physical limits of how fast this can be done. There has been very little improvement in seek times over the past couple of decades.</p></li>
+<li><p><strong>Rotational latency</strong>: Once the arm is positioned on the correct track, the disk must rotate until the desired sector passes under the read/write head. The arm sits at a fixed position on the track; it does not move along the track. The average rotational latency is half the time for one full revolution. For a disk spinning at 6,000 RPM, one revolution takes 10 milliseconds (since 6,000 RPM = 100 revolutions per second = 10 ms per revolution), giving an average rotational latency of <strong>5 milliseconds</strong>. Like seek time, rotational latency is constrained by physical limits — spinning the disk faster increases failure rates and heat.</p></li>
+<li><p><strong>Transfer time</strong>: The time to actually read the data once it is under the head. This is extremely small (microseconds) and is generally negligible compared to seek time and rotational latency.</p></li>
+</ol>
+<p>The total time for a single random disk access is therefore on the order of <strong>10 to 20 milliseconds</strong>. For a CPU, 20 milliseconds to retrieve a single tuple is an enormous amount of time.</p>
+</section>
+<section id="random-vs-sequential-access" class="level3">
+<h3 class="anchored" data-anchor-id="random-vs-sequential-access">Random vs Sequential Access</h3>
+<p>The distinction between random and sequential access on hard disks is dramatic and is one of the most important insights in database system design:</p>
+<ul>
+<li><p><strong>Random I/O</strong>: Each access requires a new seek and rotational wait. With a total access time of about 15 ms per random read (10 ms seek + 5 ms rotational latency), a disk can support roughly <strong>66 random reads per second</strong> (1000 ms / 15 ms). If each read retrieves one 512-byte sector, that is only about 33 KB/s of effective throughput — extremely slow.</p></li>
+<li><p><strong>Sequential I/O</strong>: If data is laid out sequentially on disk, no additional seeks are required after the first one. The disk simply continues reading as sectors pass under the head. Sequential data transfer rates can reach <strong>hundreds of megabytes per second</strong> — more data than the CPU can typically process. At 500 MB/s, sequential reads are thousands of times faster than random reads.</p></li>
+</ul>
+<p>This enormous gap between random and sequential I/O performance dictated roughly 30 to 40 years of database research and system building. The central challenge was: if I can arrange for my data reads to be sequential, I get outstanding performance, but the moment I start doing random seeks, performance drops dramatically. Much of classical database design — from how data is laid out on disk to how joins are executed — was motivated by this trade-off.</p>
+</section>
+<section id="worked-example" class="level3">
+<h3 class="anchored" data-anchor-id="worked-example">Worked Example</h3>
+<p><strong>Given</strong>: A disk rotating at 6,000 RPM with an average seek time of 10 ms.</p>
+<p><strong>Average rotational latency</strong>: 6,000 RPM = 100 revolutions/second. One revolution takes 1000/100 = 10 ms. The average rotational latency is half of that: <strong>5 ms</strong>.</p>
+<p><strong>Random reads per second</strong>: Each random read costs seek time + rotational latency = 10 + 5 = 15 ms. In one second (1000 ms), we can perform 1000/15 ≈ <strong>66.7 random reads</strong>.</p>
+</section>
+<section id="reliability" class="level3">
+<h3 class="anchored" data-anchor-id="reliability">Reliability</h3>
+<p>Individual hard disks have a <strong>mean time to failure (MTTF)</strong> typically quoted at 57 to 136 years, which sounds reassuringly long. However, the picture changes dramatically when you have many disks. Consider a data center with 1,000 disks, each with an MTTF of 1,200,000 hours (about 137 years). On average, one disk will fail every 1,200 hours, which is roughly <strong>every 50 days</strong>. A thousand disks is not particularly many — large data centers contain hundreds of thousands of disks, which means disks are failing essentially continuously.</p>
+<p>This reality has several important consequences for database systems. First, <strong>data replication</strong> is essential. Systems like HDFS store every piece of data in triplicate so that no single disk failure causes data loss. Second, <strong>hot swapping</strong> — the ability to replace a failed disk while the rest of the system continues running — is a requirement in production data centers. Taking a system down every time a disk fails is simply not practical at scale.</p>
+</section>
+<section id="a-note-on-track-geometry" class="level3">
+<h3 class="anchored" data-anchor-id="a-note-on-track-geometry">A Note on Track Geometry</h3>
+<p>The outer tracks of a disk platter have a larger circumference than the inner tracks, which means they can hold more data. This means data can be read faster from outer tracks (more data passes under the head per revolution). In principle, a system could exploit this by placing frequently accessed data on outer tracks. In practice, however, the complexity of managing this is rarely worth the modest performance gain — the only known example of a system deliberately exploiting this was a 1999 paper called NowSort, which used outer-track placement to win a sorting benchmark competition.</p>
+<hr>
+</section>
+</section>
+<section id="solid-state-drives-ssds" class="level2">
+<h2 class="anchored" data-anchor-id="solid-state-drives-ssds">8. Solid State Drives (SSDs)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/hdd_vs_ssd.png" class="img-fluid figure-img"></p>
+<figcaption>HDD vs SSD comparison</figcaption>
+</figure>
+</div>
+<p>Solid-state drives use <strong>NAND flash memory</strong> to store data, replacing the spinning magnetic platters of hard disks with semiconductor chips that have <strong>no moving parts</strong> — which is why they are called “solid state.” The underlying flash technology has been around for decades (it is the same technology used in USB drives and the original iPods), but it only became cheap enough for widespread use in the past 15-20 years.</p>
+<p>SSDs present the same <strong>block-oriented interface</strong> as hard disks: data is read and written in units of blocks, typically 4 KB, 8 KB, or 16 KB. This means that from the perspective of software sitting above the storage layer, SSDs and HDDs look similar. However, their performance characteristics differ significantly.</p>
+<section id="advantages" class="level3">
+<h3 class="anchored" data-anchor-id="advantages">Advantages</h3>
+<p>The most important advantage of SSDs is the absence of mechanical seeks. Because there is no arm to move and no platter to spin, <strong>random reads are dramatically faster</strong> than on hard disks. This largely eliminates the crippling random-vs-sequential performance gap that defined hard disk-era database design.</p>
+</section>
+<section id="write-complexity" class="level3">
+<h3 class="anchored" data-anchor-id="write-complexity">Write Complexity</h3>
+<p>Writes on SSDs are more complicated than on hard disks. Due to the physics of how NAND flash works, you cannot simply overwrite data in place. Instead, you must first <strong>erase</strong> an entire block (setting all bits to a known state) and then write the new data. With magnetic disks, you can update a small portion of the data directly, but with SSDs the erase-then-write cycle is unavoidable.</p>
+<p>This erase-before-write behavior creates a significant challenge: each block can only be erased a <strong>limited number of times</strong> before the underlying memory cells degrade. On a typical laptop, some blocks (like those holding the operating system) are rarely rewritten, while others (like temporary files or database logs) are rewritten constantly. This uneven usage pattern leads to uneven wear across the drive.</p>
+</section>
+<section id="wear-leveling-and-the-flash-translation-layer" class="level3">
+<h3 class="anchored" data-anchor-id="wear-leveling-and-the-flash-translation-layer">Wear Leveling and the Flash Translation Layer</h3>
+<p>To address the limited write endurance, SSDs implement <strong>wear leveling</strong> — a technique that spreads writes evenly across all blocks of the drive, even if the logical data being written would otherwise always go to the same location. This is managed by a firmware component called the <strong>Flash Translation Layer (FTL)</strong>, which maintains a mapping from logical block addresses (what the operating system sees) to physical block locations on the flash chips. The FTL transparently moves data around to ensure even wear, handles the erase-before-write requirement, and generally makes the SSD behave like a simple block device from the host system’s perspective.</p>
+</section>
+<section id="cost" class="level3">
+<h3 class="anchored" data-anchor-id="cost">Cost</h3>
+<p>SSDs remain roughly 5 to 10 times more expensive per byte than hard disks. However, both prices have dropped to the point where the absolute cost difference is small enough that SSDs are now the default choice for most database deployments. Hard disks are still used for archival and backup storage where cost per byte matters most.</p>
+<hr>
+</section>
+</section>
+<section id="evolution-of-hardware-and-its-impact-on-database-design" class="level2">
+<h2 class="anchored" data-anchor-id="evolution-of-hardware-and-its-impact-on-database-design">9. Evolution of Hardware and Its Impact on Database Design</h2>
+<section id="the-old-world" class="level3">
+<h3 class="anchored" data-anchor-id="the-old-world">The Old World</h3>
+<p>For the first several decades of database system development, the computing environment was defined by three constraints: <strong>large volumes of data</strong> that could not fit in memory, <strong>small amounts of memory</strong> (not even gigabytes for the most part), and <strong>low-speed networks</strong>. In this world, the dominant bottleneck was the communication between disk and memory. Nearly all design decisions — from data layout to query processing algorithms — were optimized to minimize disk I/O.</p>
+</section>
+<section id="tertiary-storage" class="level3">
+<h3 class="anchored" data-anchor-id="tertiary-storage">Tertiary Storage</h3>
+<p>Beyond hard disks, there are even slower storage technologies used primarily for backups and archival purposes. Optical storage (CDs, DVDs), tape drives, and automated tape libraries (“jukeboxes”) are still widely used in this role. Tape storage, for instance, is still used for backups even in university CS departments, because backing up to disk or SSD is simply too expensive for large volumes of infrequently accessed data.</p>
+</section>
+<section id="the-modern-world" class="level3">
+<h3 class="anchored" data-anchor-id="the-modern-world">The Modern World</h3>
+<p>The landscape has changed dramatically. Solid-state drives have replaced hard disks for most active database workloads, eliminating the severe random-read penalty. Main memory has become large enough — measured in terabytes on high-end servers — that many databases can fit entirely in RAM. CPUs have shifted from single-core to multi-core architectures, and GPUs provide massive parallelism for certain workloads. Networks within data centers can operate at hundreds of gigabits per second.</p>
+<p>These changes have driven an explosion of innovation in database systems over the past 15 to 20 years. At one point, many people in the field felt that database systems were a solved problem — what was left to innovate? But the dramatic shifts in hardware characteristics opened up entirely new design spaces, and the pace of innovation has been remarkable.</p>
+<hr>
+</section>
+</section>
+<section id="multi-core-cpus-and-parallelism" class="level2">
+<h2 class="anchored" data-anchor-id="multi-core-cpus-and-parallelism">10. Multi-Core CPUs and Parallelism</h2>
+<section id="moores-law" class="level3">
+<h3 class="anchored" data-anchor-id="moores-law">Moore’s Law</h3>
+<p>Gordon Moore, one of the founders of Intel, postulated that the number of transistors on a chip would roughly double every one-and-a-half to two years. This prediction — known as <strong>Moore’s Law</strong> — held remarkably well for decades. Because transistor doubling is exponential growth, the cumulative effect is staggering: in 15 years, transistor counts increased by a factor of roughly 1,000; in 30 years, by a factor of roughly 1,000,000.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/microprocessor_evolution.png" class="img-fluid figure-img"></p>
+<figcaption>Microprocessor evolution over 42 years</figcaption>
+</figure>
+</div>
+<p>The figure above shows how several microprocessor metrics evolved from 1970 to the present. Transistor counts (orange triangles) continued to climb roughly along Moore’s Law. However, <strong>clock frequency</strong> (green squares) plateaued in the early 2000s at around 3-5 GHz. The reason is fundamental: higher clock speeds generate more heat and consume more power, and we reached physical limits on how fast we could clock a chip without it overheating.</p>
+</section>
+<section id="the-shift-to-multi-core" class="level3">
+<h3 class="anchored" data-anchor-id="the-shift-to-multi-core">The Shift to Multi-Core</h3>
+<p>Once clock speeds could no longer increase, CPU manufacturers shifted to adding more cores per chip instead. This is why modern processors have 8, 16, 64, or even more cores. However, this shift came at a cost: <strong>multi-core programming is much harder</strong> than single-core programming. Extracting performance from multiple cores requires careful parallelization of algorithms, which is a significant engineering challenge.</p>
+<p>For database systems, the multi-core shift was particularly impactful. Query processing, indexing, and transaction management all had to be redesigned to take advantage of multiple cores. For the CPU manufacturers, the shift to multi-core was not a choice made eagerly — multi-core processors are more expensive and harder to program — but rather a necessity forced by the physical limits of clock speed scaling.</p>
+</section>
+<section id="graphics-processing-units-gpus" class="level3">
+<h3 class="anchored" data-anchor-id="graphics-processing-units-gpus">Graphics Processing Units (GPUs)</h3>
+<p>GPUs represent an even more extreme form of parallelism. While a general-purpose CPU might have 8 to 64 complex cores, a modern GPU can have <strong>thousands or even millions</strong> of very simple cores.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/gpu_architecture.png" class="img-fluid figure-img"></p>
+<figcaption>GPU architecture</figcaption>
+</figure>
+</div>
+<p>The individual cores on a GPU are much simpler than CPU cores — they lack the complex branch prediction, out-of-order execution, and other features that make CPU cores versatile. This simplicity is what allows so many of them to be packed onto a single chip. GPUs excel at workloads that can be decomposed into many independent, identical operations — which is why they are so effective for machine learning, cryptocurrency mining, analytics, and certain database operations. However, they are limited in general-purpose processing capability.</p>
+<hr>
+</section>
+</section>
+<section id="networks" class="level2">
+<h2 class="anchored" data-anchor-id="networks">11. Networks</h2>
+<p>The evolution of network speeds over the past four decades has been dramatic.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/network_timeline.png" class="img-fluid figure-img"></p>
+<figcaption>Network speed evolution timeline</figcaption>
+</figure>
+</div>
+<p>In 1983, network speeds were on the order of 10 megabits per second. Today, within a data center, local-area network speeds can exceed <strong>hundreds of gigabits per second</strong> — an improvement of roughly four orders of magnitude. It is worth noting that within a single rack in a data center, network speeds are typically faster than across racks, and speeds within a data center are much faster than wide-area (internet) speeds.</p>
+<p>One particularly interesting implication of fast networks is that it can be <strong>faster to access another computer’s memory over the network than to access your own local disk</strong>. Memory access operates in the nanosecond-to-microsecond range, and modern data center networks are fast enough that sending a request to another machine and receiving data from its RAM can complete faster than performing a local disk seek (which takes milliseconds). This observation has driven some fascinating system designs, including a research project at Stanford that essentially redesigned the operating system for an entire data center based on the assumption that remote memory access is cheaper than local disk access.</p>
+<p>This insight also affects database system architecture: distributed databases can keep data in the memory of different machines and serve queries by fetching data over the network, potentially achieving better performance than if each machine had to go to its own disk.</p>
+<hr>
+</section>
+<section id="parallel-architectures" class="level2">
+<h2 class="anchored" data-anchor-id="parallel-architectures">12. Parallel Architectures</h2>
+<p>When building large-scale database systems that span multiple machines, there are several fundamental architectural patterns.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/parallel_architectures.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel architecture types</figcaption>
+</figure>
+</div>
+<p><strong>Shared memory</strong>: All processors have access to the same pool of memory. This is the simplest model to program but is limited in how far it can scale, since memory becomes a bottleneck as more processors are added.</p>
+<p><strong>Shared disk</strong>: Each processor has its own memory, but all processors share access to a common disk subsystem (often through a storage-area network). This allows each node to have a large, independent memory while still sharing persistent data.</p>
+<p><strong>Shared nothing</strong>: Each node has its own processor, its own memory, and its own disk. Nodes communicate only through the network. This architecture scales the best because there are no shared resources to become bottlenecks, but it requires the most careful design to partition and distribute data effectively.</p>
+<p><strong>Hierarchical</strong>: A combination of the above, where nodes within a rack might share memory or disk, while racks communicate in a shared-nothing fashion.</p>
+<p>Most modern large-scale database systems use a <strong>shared-nothing</strong> architecture, as it provides the best scalability for very large deployments.</p>
+<hr>
+</section>
+<section id="modern-database-architectures-and-key-takeaways" class="level2">
+<h2 class="anchored" data-anchor-id="modern-database-architectures-and-key-takeaways">13. Modern Database Architectures and Key Takeaways</h2>
+<section id="then-and-now" class="level3">
+<h3 class="anchored" data-anchor-id="then-and-now">Then and Now</h3>
+<p>The traditional database architecture assumed a single-core CPU with small caches, limited main memory, and a hard disk holding most of the data. Essentially all the performance engineering was focused on minimizing disk I/O.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/db_architecture_old_vs_new.png" class="img-fluid figure-img"></p>
+<figcaption>Old vs modern database architecture</figcaption>
+</figure>
+</div>
+<p>The modern architecture looks quite different: multi-core CPUs (and GPUs) sit at the top, with caches large enough to meaningfully impact performance, main memory large enough to hold most or all of the working data, and SSDs serving primarily as a durable backing store (since memory is volatile). The bottleneck has shifted from disk I/O to CPU efficiency and cache utilization.</p>
+</section>
+<section id="data-center-scale" class="level3">
+<h3 class="anchored" data-anchor-id="data-center-scale">Data Center Scale</h3>
+<p>At data center scale, the modern single-machine architecture is replicated hundreds of thousands of times, with all machines connected by very fast interconnects.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/db_architecture_datacenter.png" class="img-fluid figure-img"></p>
+<figcaption>Data center architecture</figcaption>
+</figure>
+</div>
+<p>Building systems that effectively utilize this kind of architecture — thousands of machines, each with multi-core CPUs, large caches, large memory, and SSDs — is both fascinating and extremely challenging. This is the environment that today’s database engineers are programming against.</p>
+</section>
+<section id="key-takeaways" class="level3">
+<h3 class="anchored" data-anchor-id="key-takeaways">Key Takeaways</h3>
+<p><strong>Hardware determines performance.</strong> The gap between memory and disk, the difference between sequential and random access, and the number of available cores all fundamentally shape what database designs work well.</p>
+<p><strong>Disk access is expensive.</strong> Even with SSDs, there is a significant gap between memory and storage speeds. Minimizing unnecessary storage accesses — through buffering, sequential access patterns, and indexes — remains critical.</p>
+<p><strong>SSDs change the game.</strong> The elimination of seek time makes random reads much more practical, but write behavior is more complex and must be handled carefully.</p>
+<p><strong>Memory is increasingly important.</strong> With the cost of RAM decreasing and capacities increasing, many modern systems are designed as memory-centric databases, with disk/SSD serving primarily for durability.</p>
+<p><strong>Parallelism is essential.</strong> With clock speeds plateaued, performance improvements come from utilizing multiple cores, multiple machines, and increasingly GPUs. Designing algorithms and data structures that exploit parallelism is a key challenge.</p>
+<hr>
+</section>
+</section>
+<section id="looking-ahead" class="level2">
+<h2 class="anchored" data-anchor-id="looking-ahead">14. Looking Ahead</h2>
+<p>In the next set of notes, we will move from general computing hardware to database-specific topics. We will examine how tuples are laid out on disk blocks and memory pages (including fixed-length and variable-length record formats), and how the choice of layout affects performance at both the disk and cache levels. Following that, we will study index structures — B+ trees, hash indexes, and log-structured merge trees — that allow databases to efficiently locate specific tuples without scanning entire tables.</p>
+<hr>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

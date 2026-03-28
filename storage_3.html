@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Storage and Indexes — Indexes – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#what-is-an-index" id="toc-what-is-an-index" class="nav-link active" data-scroll-target="#what-is-an-index">1. What is an Index?</a></li>
+  <li><a href="#primary-vs-secondary-indexes-sparse-vs-dense" id="toc-primary-vs-secondary-indexes-sparse-vs-dense" class="nav-link" data-scroll-target="#primary-vs-secondary-indexes-sparse-vs-dense">2. Primary vs Secondary Indexes; Sparse vs Dense</a></li>
+  <li><a href="#multi-level-indexes" id="toc-multi-level-indexes" class="nav-link" data-scroll-target="#multi-level-indexes">3. Multi-Level Indexes</a></li>
+  <li><a href="#b-tree-indexes" id="toc-b-tree-indexes" class="nav-link" data-scroll-target="#b-tree-indexes">4. B+-Tree Indexes</a>
+  <ul class="collapse">
+  <li><a href="#structure" id="toc-structure" class="nav-link" data-scroll-target="#structure">4.1 Structure</a></li>
+  <li><a href="#searching" id="toc-searching" class="nav-link" data-scroll-target="#searching">4.2 Searching</a></li>
+  <li><a href="#insertion" id="toc-insertion" class="nav-link" data-scroll-target="#insertion">4.3 Insertion</a></li>
+  <li><a href="#deletion" id="toc-deletion" class="nav-link" data-scroll-target="#deletion">4.4 Deletion</a></li>
+  <li><a href="#b-trees-summary" id="toc-b-trees-summary" class="nav-link" data-scroll-target="#b-trees-summary">4.5 B+-Trees: Summary</a></li>
+  </ul></li>
+  <li><a href="#log-structured-merge-trees-lsm-trees" id="toc-log-structured-merge-trees-lsm-trees" class="nav-link" data-scroll-target="#log-structured-merge-trees-lsm-trees">5. Log-Structured Merge Trees (LSM Trees)</a>
+  <ul class="collapse">
+  <li><a href="#motivation" id="toc-motivation" class="nav-link" data-scroll-target="#motivation">5.1 Motivation</a></li>
+  <li><a href="#the-sstable-sorted-string-table" id="toc-the-sstable-sorted-string-table" class="nav-link" data-scroll-target="#the-sstable-sorted-string-table">5.2 The SSTable (Sorted String Table)</a></li>
+  <li><a href="#flushing-to-disk" id="toc-flushing-to-disk" class="nav-link" data-scroll-target="#flushing-to-disk">5.3 Flushing to Disk</a></li>
+  <li><a href="#compaction" id="toc-compaction" class="nav-link" data-scroll-target="#compaction">5.4 Compaction</a></li>
+  <li><a href="#searching-1" id="toc-searching-1" class="nav-link" data-scroll-target="#searching-1">5.5 Searching</a></li>
+  <li><a href="#benefits-and-drawbacks" id="toc-benefits-and-drawbacks" class="nav-link" data-scroll-target="#benefits-and-drawbacks">5.6 Benefits and Drawbacks</a></li>
+  </ul></li>
+  <li><a href="#hash-indexes" id="toc-hash-indexes" class="nav-link" data-scroll-target="#hash-indexes">6. Hash Indexes</a>
+  <ul class="collapse">
+  <li><a href="#strengths-and-limitations" id="toc-strengths-and-limitations" class="nav-link" data-scroll-target="#strengths-and-limitations">Strengths and Limitations</a></li>
+  </ul></li>
+  <li><a href="#additional-index-topics" id="toc-additional-index-topics" class="nav-link" data-scroll-target="#additional-index-topics">7. Additional Index Topics</a>
+  <ul class="collapse">
+  <li><a href="#multiple-key-access-and-index-anding" id="toc-multiple-key-access-and-index-anding" class="nav-link" data-scroll-target="#multiple-key-access-and-index-anding">7.1 Multiple-Key Access and Index-ANDing</a></li>
+  <li><a href="#composite-search-keys" id="toc-composite-search-keys" class="nav-link" data-scroll-target="#composite-search-keys">7.2 Composite Search Keys</a></li>
+  <li><a href="#bitmap-indexes" id="toc-bitmap-indexes" class="nav-link" data-scroll-target="#bitmap-indexes">7.3 Bitmap Indexes</a></li>
+  <li><a href="#spatial-indexes-and-r-trees" id="toc-spatial-indexes-and-r-trees" class="nav-link" data-scroll-target="#spatial-indexes-and-r-trees">7.4 Spatial Indexes and R-Trees</a></li>
+  </ul></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">8. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Storage and Indexes — Indexes</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="what-is-an-index" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-an-index">1. What is an Index?</h2>
+<p>An <strong>index</strong> is a data structure designed for efficient search through large databases. Without an index, finding a specific tuple in a relation with millions of rows would require scanning through the entire relation — a process that, even with fast sequential I/O, can take tens of seconds. Indexes allow us to locate specific tuples in milliseconds.</p>
+<p>There are two key ideas behind indexing. First, records can be mapped to disk blocks in specific ways — sorted by some attribute, or organized by a hash function. Second, <strong>auxiliary data structures</strong> can be maintained alongside the data that allow quick lookup of specific records.</p>
+<p>A <strong>search key</strong> is the attribute (or set of attributes) used to look up records in an index. For example, in a <em>persons</em> table, the SSN might serve as a search key. Note that a search key is not the same as a primary key — any attribute can serve as a search key for an index.</p>
+<p>There are two broad categories of indexes:</p>
+<ul>
+<li><strong>Ordered indexes</strong>, which rely on sorting the search keys in some fashion.</li>
+<li><strong>Hash-based indexes</strong>, which use a hash function to map search keys to locations.</li>
+</ul>
+<p>We will examine both types, starting with ordered indexes and the B+-tree, then moving to log-structured merge trees (a modern alternative), and finally covering hash indexes and several other index types.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-048.png" class="img-fluid figure-img"></p>
+<figcaption>Index basics</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="primary-vs-secondary-indexes-sparse-vs-dense" class="level2">
+<h2 class="anchored" data-anchor-id="primary-vs-secondary-indexes-sparse-vs-dense">2. Primary vs Secondary Indexes; Sparse vs Dense</h2>
+<p>One of the first important distinctions is between <strong>primary</strong> and <strong>secondary</strong> indexes.</p>
+<p>A <strong>primary index</strong> is an index built on the attribute by which the relation is physically sorted. For example, consider the instructor relation sorted by instructor ID. A primary index on ID can be <strong>sparse</strong> — it does not need to contain an entry for every single tuple. Instead, it only needs enough entries to direct you to the right disk block. For instance, if the index contains keys 10101, 32343, and 76766, and you are looking for instructor 12121, you can see from the index that 12121 falls between 10101 and 32343, so you follow the pointer for 10101 and then scan through that block. You have to imagine that in practice there might be a million tuples here, not ten, so the jumps that the index allows are substantial.</p>
+<p>A <strong>secondary index</strong> is built on an attribute by which the relation is <em>not</em> sorted. For example, an index on salary when the relation is sorted by ID. In this case, the pointers from the index into the relation are “all over the place” — looking up salary 40000 takes you to one location, salary 80000 to somewhere completely different, and so on. This creates a <strong>random access pattern</strong> that can be very expensive.</p>
+<p>A secondary index must be <strong>dense</strong> — every single value of the search key must be present in the index, because without the underlying sort order, there is no way to infer where missing values might be.</p>
+<p>An important practical note: secondary indexes must be used with care. The random access pattern they create can be so expensive that in many cases it is actually <strong>faster to simply scan the entire relation</strong> sequentially rather than follow a secondary index. A sequential scan, even though it reads more data, avoids the costly random I/O that a secondary index requires.</p>
+<p>Note that a secondary index is still an <em>ordered</em> index — the index itself is sorted by the search key. It is the pointers from the index to the relation that jump around randomly.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-049.png" class="img-fluid figure-img"></p>
+<figcaption>Primary vs Secondary Indexes</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="multi-level-indexes" class="level2">
+<h2 class="anchored" data-anchor-id="multi-level-indexes">3. Multi-Level Indexes</h2>
+<p>What happens when the index itself becomes very large? Consider a relation with one billion tuples. If each disk block can hold 100 tuples, the relation occupies 10 million blocks. An index with one entry per block would itself be 10 million entries — far too large to search efficiently without additional help.</p>
+<p>The solution is to build <strong>an index on top of the index</strong>. This creates a multi-level index structure: an outer (higher-level) index that helps you navigate quickly through the inner (lower-level) index, which in turn points to the actual data blocks. This idea of hierarchical indexing naturally leads to tree-structured indexes, the most important of which is the B+-tree.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-050.png" class="img-fluid figure-img"></p>
+<figcaption>Multi-level Indexes</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="b-tree-indexes" class="level2">
+<h2 class="anchored" data-anchor-id="b-tree-indexes">4. B+-Tree Indexes</h2>
+<section id="structure" class="level3">
+<h3 class="anchored" data-anchor-id="structure">4.1 Structure</h3>
+<p>The B+-tree is the most widely used index structure in database systems. It is a balanced tree with three types of nodes: <strong>leaf nodes</strong> at the bottom, <strong>interior nodes</strong> in the middle, and a single <strong>root node</strong> at the top. Each node in the tree corresponds to exactly one disk block.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-051.png" class="img-fluid figure-img"></p>
+<figcaption>B+-Tree Index structure</figcaption>
+</figure>
+</div>
+<p>The <strong>leaf nodes</strong> contain the actual search keys along with pointers to the corresponding tuples in the relation. Importantly, the leaf nodes are linked together from left to right in sorted order. This chain of leaf nodes is what makes range queries efficient — once you find the starting point, you can simply follow the chain to retrieve all tuples in the range.</p>
+<p>The <strong>interior nodes</strong> serve a single purpose: to <strong>direct traffic</strong> during searches. Each interior node contains search keys and pointers to child nodes. When searching for a key, you compare it against the keys in the interior node to decide which pointer to follow — left, right, or somewhere in between.</p>
+<p>The <strong>root node</strong> is the entry point for all searches.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-052.png" class="img-fluid figure-img"></p>
+<figcaption>B+-Tree properties</figcaption>
+</figure>
+</div>
+<p>Several important properties define B+-trees:</p>
+<p><strong>Balanced.</strong> All paths from the root to any leaf node have the same length. Unlike AVL trees or red-black trees, which can have slightly uneven paths, B+-trees guarantee perfect balance.</p>
+<p><strong>At least 50% full.</strong> Every node (except the root) must be at least 50% full. This property balances two competing concerns: if nodes are too empty, we waste space and fetch large disk blocks only to find most of the data is missing; if nodes are too full, maintaining the tree during insertions becomes complicated. The sweet spot is typically 50-66% occupancy. Note that “50% full” refers to the number of <strong>pointers</strong> in a node, not the number of keys.</p>
+</section>
+<section id="searching" class="level3">
+<h3 class="anchored" data-anchor-id="searching">4.2 Searching</h3>
+<p>Searching a B+-tree is logarithmic in the number of entries, but the base of the logarithm is much larger than 2. Specifically, the height of the tree is approximately log<sub>B/2</sub>(N), where B is the maximum number of entries per node (also called the <strong>order</strong> of the tree) and N is the total number of entries.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-053.png" class="img-fluid figure-img"></p>
+<figcaption>B+-Tree searching</figcaption>
+</figure>
+</div>
+<p>In practice, B is typically around 100 to 200, because a single disk block can hold that many key-pointer pairs. This large branching factor is the key advantage of B+-trees over binary search trees: at each level, instead of choosing between 2 children, you choose among 100-200 children. This means the tree grows very slowly in height. A B+-tree over one billion entries with B=200 would have a height of only about 4 — meaning you need at most 4 random disk accesses to find any tuple.</p>
+<p>Moreover, in practice the situation is even better. The top levels of the tree (root and one or two levels below) are typically cached in memory because they are accessed so frequently. This means that a search often requires only <strong>1 or 2 actual disk accesses</strong> — one to read the appropriate leaf node, and one to fetch the actual tuple from the relation.</p>
+<p>For <strong>range queries</strong> (e.g., find all instructors with names between “Einstein” and “Kim”), you first navigate down the tree to find the left endpoint (“Einstein”), and then follow the chain of leaf node pointers to traverse through all matching entries. At each leaf node, you follow the pointers to retrieve the actual tuples from the relation.</p>
+<p>As a concrete example, suppose you are searching for “Srinivasan” in the B+-tree shown above. Starting at the root, you see the key “Mozart.” Since “Srinivasan” comes after “Mozart,” you follow the right pointer. At the next level, you see “Srinivasan” — following the convention of taking the right pointer on equality, you arrive at the leaf node containing “Srinivasan” and “Wu.” You then follow the pointer from “Srinivasan” to retrieve the actual tuple from the relation.</p>
+</section>
+<section id="insertion" class="level3">
+<h3 class="anchored" data-anchor-id="insertion">4.3 Insertion</h3>
+<p>Inserting a new entry into a B+-tree starts by finding the leaf node where the entry should go. If there is space in that leaf node, the entry is simply added and we are done.</p>
+<p>The interesting case arises when the target leaf node is <strong>full</strong>. In this case, the leaf must be <strong>split</strong> into two nodes, and a key must be propagated up to the parent to account for the new child. If the parent is also full, it too must be split, with a key propagated further up. In the worst case, this splitting can cascade all the way to the root, potentially creating a new root and increasing the height of the tree by one.</p>
+<p>However, most modifications tend to be <strong>local</strong> — they involve only the target leaf node and its immediate parent.</p>
+<p><strong>Example: Inserting “Adams.”</strong> The entry for “Adams” should go in the leftmost leaf node (which contains “Brandt” and “Califieri” and “Crick”). Since this node is full, it is split into two: one containing “Adams” and “Brandt,” and another containing “Califieri” and “Crick.” The key “Califieri” is propagated up to the parent interior node, which now contains “Califieri,” “Einstein,” and “Gold.”</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-054.png" class="img-fluid figure-img"></p>
+<figcaption>Insertion of “Adams”</figcaption>
+</figure>
+</div>
+<p><strong>Example: Inserting “Lamport.”</strong> This is a more complex case. “Lamport” should go between “Kim” and “Mozart” in a leaf node that is already full (containing “Gold,” “Katz,” “Kim”). The leaf is split, and a new key must be propagated up. But the parent interior node is also full, so it too must split. This propagation reaches the root, which must also split, creating a <strong>new root</strong> with key “Gold” and “Mozart,” thereby increasing the height of the tree by one.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-055.png" class="img-fluid figure-img"></p>
+<figcaption>Insertion of “Lamport”</figcaption>
+</figure>
+</div>
+</section>
+<section id="deletion" class="level3">
+<h3 class="anchored" data-anchor-id="deletion">4.4 Deletion</h3>
+<p>Deletion from a B+-tree begins by finding and removing the entry from the appropriate leaf node.</p>
+<p><strong>Simple case.</strong> If deleting an entry (like “Katz”) leaves the leaf node with enough entries to remain at least 50% full, nothing else needs to happen — the entry is simply removed.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-056.png" class="img-fluid figure-img"></p>
+<figcaption>B+-Tree deletion examples</figcaption>
+</figure>
+</div>
+<p><strong>Interior node keys need not be updated.</strong> A common misconception is that if a deleted key also appears in an interior node, that interior node must be updated. This is <strong>not</strong> necessary. The search keys in interior nodes exist solely to <strong>direct traffic</strong> during searches — there is no requirement that they correspond to keys that actually exist in the relation. For example, if “Gold” is deleted from the leaf but still appears in an interior node, that is perfectly fine. Someone searching for “Gold” will be directed to the right area and simply discover that it does not exist, which is the correct answer. Updating the interior node would be expensive and provides no benefit.</p>
+<p><strong>Underfull nodes (textbook answer).</strong> If a deletion causes a leaf node to become underfull (less than 50% full), the textbook algorithm calls for <strong>redistributing</strong> entries from a sibling node. For instance, if deleting both “Singh” and “Wu” leaves a leaf with only “Mozart,” you would borrow “Kim” from the neighboring leaf to restore balance.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-057.png" class="img-fluid figure-img"></p>
+<figcaption>Deletion causing underfull — redistribution</figcaption>
+</figure>
+</div>
+<p><strong>Practical reality.</strong> In most real implementations, underfull nodes are simply left as-is. Inserts are more common than deletes in typical database workloads, so something will likely be inserted into the underfull node soon. The cost of redistributing is rarely worth the effort, especially since the redistribution can cascade — if you borrow from a sibling, the sibling might become underfull, requiring further redistribution.</p>
+<p><strong>Extreme case: tree height reduction.</strong> In rare cases, deletion can cause enough nodes to become empty that the tree’s height decreases. The example below shows a case where deleting “Gold” ultimately causes the root to be merged with its children, reducing the tree height by one. Again, practical implementations would typically not bother with this.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-058.png" class="img-fluid figure-img"></p>
+<figcaption>Deletion reducing tree height</figcaption>
+</figure>
+</div>
+</section>
+<section id="b-trees-summary" class="level3">
+<h3 class="anchored" data-anchor-id="b-trees-summary">4.5 B+-Trees: Summary</h3>
+<p>The main benefit of B+-trees is dramatic: they reduce the number of disk block accesses needed to find a specific tuple from potentially millions (in a sequential scan) to just a handful. Consider a relation occupying 1,000,000 blocks (about 4 GB with 4 KB blocks). A sequential scan at 200 MB/s would take about 20 seconds. A B+-tree lookup would require only 4-5 random accesses, taking roughly 40-50 milliseconds — <strong>hundreds of times faster</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-059.png" class="img-fluid figure-img"></p>
+<figcaption>B+-Trees Summary</figcaption>
+</figure>
+</div>
+<p>B+-trees have been the mainstay of database indexing for over 40 years, since they were first proposed in the late 1970s. PostgreSQL, MySQL, SQL Server, and most other established database systems use B+-trees as their primary index structure.</p>
+<p>However, B+-trees are no longer considered the best choice for new systems. The fundamental issue is that B+-tree maintenance requires <strong>in-place random updates</strong> — modifying individual blocks scattered across the disk. As we will see next, log-structured merge trees (LSM trees) avoid this problem entirely, making them the preferred choice for most modern database systems.</p>
+<hr>
+</section>
+</section>
+<section id="log-structured-merge-trees-lsm-trees" class="level2">
+<h2 class="anchored" data-anchor-id="log-structured-merge-trees-lsm-trees">5. Log-Structured Merge Trees (LSM Trees)</h2>
+<section id="motivation" class="level3">
+<h3 class="anchored" data-anchor-id="motivation">5.1 Motivation</h3>
+<p>Although LSM trees were proposed quite some time ago, their widespread adoption in databases is more recent. Today, a large number of modern database systems use some variation of LSM trees, including <strong>RocksDB</strong> (developed by Facebook), <strong>LevelDB</strong> (developed by Google), <strong>Cassandra</strong>, <strong>InfluxDB</strong>, and <strong>Bigtable</strong>.</p>
+<p>This topic is not well covered in most database textbooks, so it deserves particular attention.</p>
+<p>The key insight motivating LSM trees is that traditional indexes like B+-trees and hash indexes require <strong>in-place random updates</strong>. When you insert or delete an entry, you must update specific blocks scattered across the disk. As the gap between random and sequential I/O performance has grown, this has become increasingly problematic. The problem is even worse for SSDs: while SSDs are excellent at random <em>reads</em>, they perform poorly on small random <em>writes</em> due to the erase-before-write requirement of NAND flash.</p>
+<p>If you look at a B+-tree insertion, you might end up updating a leaf block here, a parent block there, and potentially several more blocks scattered across the disk. Each of these is a separate random write. LSM trees are designed to avoid this entirely.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-060.png" class="img-fluid figure-img"></p>
+<figcaption>LSM Trees — motivation</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-sstable-sorted-string-table" class="level3">
+<h3 class="anchored" data-anchor-id="the-sstable-sorted-string-table">5.2 The SSTable (Sorted String Table)</h3>
+<p>The core data structure in an LSM tree is the <strong>SSTable</strong> (Sorted String Table). Despite the name “table,” it is simply a sorted list of key-value pairs. The keys are the search keys (e.g., instructor ID), and the values are the remaining attributes of each tuple.</p>
+<p>In an LSM tree, the active SSTable lives <strong>in memory</strong>. It can grow quite large — potentially gigabytes. Because it is in memory, an in-memory index structure (such as a skip list, red-black tree, or even a small B+-tree) is maintained on top of it to enable fast lookups. This in-memory index is <strong>not persisted to disk</strong> — if the system crashes, it can be rebuilt.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-061.png" class="img-fluid figure-img"></p>
+<figcaption>SSTable in memory</figcaption>
+</figure>
+</div>
+<p>When a new tuple arrives — say with key 17 — it is simply inserted into the in-memory SSTable in its correct sorted position. This is extremely fast because it involves no disk I/O at all.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-062.png" class="img-fluid figure-img"></p>
+<figcaption>Inserting into SSTable</figcaption>
+</figure>
+</div>
+</section>
+<section id="flushing-to-disk" class="level3">
+<h3 class="anchored" data-anchor-id="flushing-to-disk">5.3 Flushing to Disk</h3>
+<p>At some point, the in-memory SSTable becomes too large (perhaps exceeding a configured threshold of 1 or 5 GB). When this happens, the entire SSTable is written to disk as a single, contiguous, immutable file, and a new empty SSTable is started in memory.</p>
+<p>Over time, this process produces a series of SSTables on disk, each timestamped with when it was written. For example, you might have an SSTable written at 6:15 AM, another at 9:15 AM, and another at 10:00 AM.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-063.png" class="img-fluid figure-img"></p>
+<figcaption>SSTables on disk</figcaption>
+</figure>
+</div>
+<p>Several important properties of on-disk SSTables:</p>
+<p><strong>Immutable.</strong> Once written to disk, an SSTable is never modified. This is a fundamental design choice that makes writes extremely efficient — they are always large sequential writes.</p>
+<p><strong>Overlapping keys.</strong> Different SSTables on disk may contain entries for the same key. For example, key 12 might appear in both the 6:15 AM and 10:00 AM SSTables. The <strong>timestamp</strong> determines which entry is current — the most recent SSTable always has the authoritative version.</p>
+<p><strong>Tombstones.</strong> When a tuple is deleted, a special <strong>tombstone</strong> marker is recorded in the current in-memory SSTable. This is necessary because the deleted key might exist in older SSTables on disk, and we need to record the fact that it was deleted. The tombstone effectively says “this key was deleted at this time.”</p>
+<p><strong>Updates</strong> are handled simply by inserting the new version of the tuple into the in-memory SSTable. The older version in a previous SSTable becomes superseded.</p>
+</section>
+<section id="compaction" class="level3">
+<h3 class="anchored" data-anchor-id="compaction">5.4 Compaction</h3>
+<p>Over time, the number of SSTables on disk grows, and many of them contain overlapping or outdated entries. <strong>Compaction</strong> is the process of periodically merging multiple SSTables into fewer, larger ones.</p>
+<p>Since each SSTable is already sorted, compaction is essentially a <strong>sort-merge</strong> operation — a very efficient process. During compaction, duplicate keys are resolved (keeping only the most recent version), tombstones are applied (removing deleted keys), and space is reclaimed.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-064.png" class="img-fluid figure-img"></p>
+<figcaption>Compaction — sort-merge</figcaption>
+</figure>
+</div>
+<p>Compaction creates a hierarchical structure of levels. <strong>Level 0</strong> (called C0) contains the freshly flushed SSTables. When enough Level 0 tables accumulate, they are compacted into a <strong>Level 1</strong> (C1) table. When enough Level 1 tables accumulate, they are compacted into Level 2, and so on. Each level contains fewer but larger files.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-065.png" class="img-fluid figure-img"></p>
+<figcaption>Multi-level compaction</figcaption>
+</figure>
+</div>
+</section>
+<section id="searching-1" class="level3">
+<h3 class="anchored" data-anchor-id="searching-1">5.5 Searching</h3>
+<p>To search for a key in an LSM tree, you first check the <strong>in-memory SSTable</strong>, since it contains the most recent data. If the key is found there, you are done.</p>
+<p>If the key is not in memory, you must search the on-disk SSTables. The challenge is that the key could be in any of them — you don’t know which one without looking. Naively, you might have to search through many SSTables, which would be slow.</p>
+<p>To address this, LSM trees use <strong>bloom filters</strong> — probabilistic data structures that can quickly tell you whether a given SSTable <em>might</em> contain a particular key. A bloom filter can definitively say “this key is NOT in this SSTable” (no false negatives), but might occasionally say “this key MIGHT be in this SSTable” when it actually is not (false positives). This allows the system to skip most SSTables during a search, checking only those that the bloom filter identifies as potential matches.</p>
+</section>
+<section id="benefits-and-drawbacks" class="level3">
+<h3 class="anchored" data-anchor-id="benefits-and-drawbacks">5.6 Benefits and Drawbacks</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-066.png" class="img-fluid figure-img"></p>
+<figcaption>LSM Trees — search, benefits, drawbacks</figcaption>
+</figure>
+</div>
+<p><strong>Benefits.</strong> LSM trees excel at write performance. All writes go to the in-memory SSTable (fast) and are eventually flushed as large sequential writes (efficient for both HDDs and SSDs). Compaction is also done as large sequential operations. This makes LSM trees ideal for write-heavy workloads and SSD-based storage.</p>
+<p><strong>Drawbacks.</strong> The main drawback is <strong>read amplification</strong>: finding a key may require checking the in-memory SSTable and then multiple on-disk SSTables, each of which might be a separate disk access. While bloom filters mitigate this, reads are generally slower than in a B+-tree, where a single traversal from root to leaf suffices. Additionally, LSM trees can only support <strong>primary indexes</strong> — the data within each SSTable is sorted by the search key, so there can only be one sort order.</p>
+<hr>
+</section>
+</section>
+<section id="hash-indexes" class="level2">
+<h2 class="anchored" data-anchor-id="hash-indexes">6. Hash Indexes</h2>
+<p>Hash-based indexing uses a <strong>hash function</strong> to map search key values to bucket numbers. Each bucket corresponds to one disk block (or a chain of blocks if overflow occurs). To find a record, you compute the hash of the search key, go directly to the corresponding bucket, and look for the record there.</p>
+<p>When a bucket becomes full, additional records are placed in <strong>overflow pages</strong> — extra blocks linked to the original bucket in a chain. This scheme is called <strong>closed hashing</strong> (or overflow chaining). An alternative called <strong>open hashing</strong> exists but is not suitable for database applications.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-069.png" class="img-fluid figure-img"></p>
+<figcaption>Overflow pages and closed hashing</figcaption>
+</figure>
+</div>
+<p>The hash function should produce a uniform distribution of keys across buckets to avoid some buckets overflowing while others remain nearly empty. Designing good hash functions is a significant topic in itself.</p>
+<p>Hash indexes can be built as a separate data structure alongside the relation (similar to how B+-trees work). The index contains hash buckets, and each bucket entry stores the search key value and a pointer to the corresponding tuple in the relation.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-071.png" class="img-fluid figure-img"></p>
+<figcaption>Hash index on instructor ID</figcaption>
+</figure>
+</div>
+<section id="strengths-and-limitations" class="level3">
+<h3 class="anchored" data-anchor-id="strengths-and-limitations">Strengths and Limitations</h3>
+<p>Hash indexes are <strong>extremely fast for equality searches</strong>: compute the hash, go to the bucket, find the record. This is typically a single disk access (or two if there are overflow pages).</p>
+<p>However, hash indexes <strong>cannot support range queries at all</strong>. If you want to find all instructors with IDs between 10,000 and 20,000, there is no efficient way to do this with a hash index — literally the only approach would be to hash 10,000, then 10,001, then 10,002, and so on, which is clearly impractical. In contrast, a B+-tree handles this effortlessly by navigating to the left endpoint and following the leaf chain.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-072.png" class="img-fluid figure-img"></p>
+<figcaption>Hash index properties</figcaption>
+</figure>
+</div>
+<p>Because range queries are so common in databases (queries with <code>BETWEEN</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>), hash indexes are rarely used for on-disk storage in database systems. B+-trees (or LSM trees) are almost always preferred because they support both equality and range queries.</p>
+<p>However, <strong>hashing is extremely widely used in memory</strong> during query processing. It is the foundation of hash joins, one of the most important join algorithms. In distributed systems, hashing is used to distribute data across machines — for example, MongoDB uses hashing to partition data across servers, because hashing provides a more uniform distribution than range-based partitioning.</p>
+<p>There also exist <strong>dynamic hashing</strong> schemes (such as extendable hashing and linear hashing) that allow the number of buckets to grow and shrink as the data changes, avoiding the need to choose a fixed number of buckets up front.</p>
+<hr>
+</section>
+</section>
+<section id="additional-index-topics" class="level2">
+<h2 class="anchored" data-anchor-id="additional-index-topics">7. Additional Index Topics</h2>
+<section id="multiple-key-access-and-index-anding" class="level3">
+<h3 class="anchored" data-anchor-id="multiple-key-access-and-index-anding">7.1 Multiple-Key Access and Index-ANDing</h3>
+<p>Queries often involve conditions on multiple attributes. Consider:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="kw">ID</span> <span class="kw">FROM</span> instructor</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> dept_name <span class="op">=</span> <span class="st">'Finance'</span> <span class="kw">AND</span> salary <span class="op">=</span> <span class="dv">80000</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If you have separate indexes on <code>dept_name</code> and <code>salary</code>, there are several strategies:</p>
+<p><strong>Option 1:</strong> Use the <code>dept_name</code> index to find all instructors in Finance, then check each one to see if their salary is 80,000.</p>
+<p><strong>Option 2:</strong> Use the <code>salary</code> index to find all instructors earning 80,000, then check each one to see if they are in the Finance department.</p>
+<p><strong>Option 3: Index-ANDing.</strong> Use the <code>dept_name</code> index to get a list of <em>pointers</em> to all Finance instructors (without actually following them). Similarly, use the <code>salary</code> index to get a list of pointers to all instructors earning 80,000. Then <strong>intersect</strong> the two pointer lists. Only follow the pointers that appear in both lists.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-075.png" class="img-fluid figure-img"></p>
+<figcaption>Multiple-key access strategies</figcaption>
+</figure>
+</div>
+<p>Index-ANDing can be dramatically more efficient than the other options. If a million tuples satisfy the department condition and a million satisfy the salary condition, but only 100 satisfy both, then Options 1 and 2 would each retrieve a million tuples only to discard most of them. Index-ANDing retrieves the two pointer lists, intersects them to get 100 pointers, and then follows only those 100 pointers. This technique is useful enough that it has its own name and is implemented in many database systems.</p>
+</section>
+<section id="composite-search-keys" class="level3">
+<h3 class="anchored" data-anchor-id="composite-search-keys">7.2 Composite Search Keys</h3>
+<p>Instead of building separate indexes and using index-ANDing, you can build a single index on <strong>multiple attributes</strong> together. For example, a composite index on <code>(dept_name, salary)</code> uses <strong>lexicographic ordering</strong>: the pair (a<sub>1</sub>, a<sub>2</sub>) &lt; (b<sub>1</sub>, b<sub>2</sub>) if a<sub>1</sub> &lt; b<sub>1</sub>, or if a<sub>1</sub> = b<sub>1</sub> and a<sub>2</sub> &lt; b<sub>2</sub>.</p>
+<p>This is ideal for queries like:</p>
+<ul>
+<li><code>WHERE dept_name = 'Finance' AND salary = 80000</code> — can look up the exact composite key</li>
+<li><code>WHERE dept_name = 'Finance' AND salary &lt; 80000</code> — can find “Finance” and then scan within that range</li>
+</ul>
+<p>However, it does <strong>not</strong> work well for:</p>
+<ul>
+<li><code>WHERE dept_name &lt; 'Finance' AND salary = 80000</code> — the salary condition cannot be efficiently used because salary is the second component</li>
+</ul>
+<p>No new data structure is required — you simply use a B+-tree with concatenated keys. Whether to build composite indexes depends on the actual query workload: they are very effective for common multi-attribute queries but add storage overhead and maintenance cost.</p>
+</section>
+<section id="bitmap-indexes" class="level3">
+<h3 class="anchored" data-anchor-id="bitmap-indexes">7.3 Bitmap Indexes</h3>
+<p><strong>Bitmap indexes</strong> are a specialized index type that is heavily used in <strong>data warehouses</strong> (systems like Snowflake, Amazon Redshift, and similar analytical databases) but not in transactional databases like PostgreSQL.</p>
+<p>The idea is simple. For each distinct value of an attribute, maintain a <strong>bitmap</strong> — a bit vector with one bit per record in the relation. If the <em>i</em>-th record has that attribute value, the <em>i</em>-th bit is 1; otherwise, it is 0.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-078.png" class="img-fluid figure-img"></p>
+<figcaption>Bitmap index example</figcaption>
+</figure>
+</div>
+<p>For example, consider an attribute <code>gender</code> with values {m, f} and an attribute <code>income_level</code> with values {L1, L2, L3, L4, L5}. The bitmap for <code>gender = m</code> might be <code>10010</code>, indicating that records 0 and 3 are male. The bitmap for <code>gender = f</code> would be <code>01101</code>.</p>
+<p>The power of bitmap indexes becomes clear with multi-predicate queries. To find all female instructors at income level L3, you take the bitmap for <code>gender = f</code> (01101) and <strong>AND</strong> it with the bitmap for <code>income_level = L3</code> (00001). The result (00001) tells you that only record 4 satisfies both conditions — without ever looking at the actual data. For COUNT queries, you don’t even need to follow any pointers; the bitmap tells you the answer directly.</p>
+<p>Bitmap indexes are excellent for attributes with a small number of distinct values (low cardinality) and for workloads dominated by analytical queries that combine conditions on multiple attributes. However, <strong>updating bitmap indexes is very expensive</strong> — inserting or deleting a single tuple requires modifying every bitmap for every indexed attribute. This is why bitmap indexes are only practical for read-mostly data warehouses where data is loaded in batches, not for OLTP systems with frequent updates.</p>
+</section>
+<section id="spatial-indexes-and-r-trees" class="level3">
+<h3 class="anchored" data-anchor-id="spatial-indexes-and-r-trees">7.4 Spatial Indexes and R-Trees</h3>
+<p>When data has a spatial component — geographical coordinates, bounding rectangles, polygons, or higher-dimensional points — standard B+-trees and hash indexes are not effective. Queries on spatial data typically ask questions like: “Given a point, which rectangles contain it?” or “Find all rectangles that overlap with a given query rectangle.”</p>
+<p><strong>R-trees</strong> are one of the simplest and most widely used spatial index structures. They are structurally similar to B+-trees, but instead of one-dimensional search keys, each node contains <strong>bounding rectangles</strong> that enclose the spatial objects in its subtree. During a search, you traverse the tree by checking which bounding rectangles overlap with the query region.</p>
+<p>R-trees work well for two-dimensional data but become less effective as the number of dimensions increases. For very high-dimensional data — such as the vector embeddings used in modern machine learning and vector search — different index structures are needed (e.g., approximate nearest-neighbor structures like HNSW). Vector search, which involves finding the closest vectors to a given query vector, is conceptually related to spatial indexing but requires fundamentally different approaches.</p>
+<p>Professor Hanan Samet at the University of Maryland is one of the foremost experts in spatial data structures and has written several seminal books on this topic, along with extensive research spanning over 50 years.</p>
+<hr>
+</section>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">8. Summary</h2>
+<p>The goal of indexing is to <strong>quickly find the tuples that satisfy a specific condition</strong>, typically without scanning the entire relation.</p>
+<p><strong>Equality and range queries</strong> are the most common query types in databases, which is why <strong>B+-trees</strong> have been the predominant on-disk index structure for decades. They support both equality lookups (navigate from root to leaf) and range queries (follow the leaf chain) efficiently.</p>
+<p><strong>LSM trees</strong> are the preferred choice in most modern database systems, particularly for write-heavy workloads. By converting random writes into sequential writes and using compaction to maintain sorted order, they achieve much better write performance than B+-trees, at the cost of somewhat slower reads (read amplification). Systems like RocksDB, LevelDB, and Cassandra all use LSM trees.</p>
+<p><strong>Hash indexes</strong> are used primarily for <strong>in-memory operations</strong> during query processing (especially hash joins) and for data distribution in distributed systems. They are rarely used for on-disk storage because they cannot support range queries.</p>
+<p><strong>Bitmap indexes</strong> are specialized for analytical and data warehouse workloads where queries combine conditions on multiple low-cardinality attributes and data is updated infrequently.</p>
+<p>Beyond these, there is a rich landscape of specialized index structures for different data types and query patterns — spatial indexes (R-trees), full-text indexes, vector indexes for nearest-neighbor search, and many more. Database systems typically support B+-trees (or LSM trees) for general-purpose on-disk indexing, hashing for in-memory operations, and bitmap indexes in analytical systems, while specialized structures are maintained separately as needed.</p>
+<hr>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
