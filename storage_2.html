@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Lecture 1: Introduction – CMSC424 Lecture Notes</title>
+<title>CMSC424: Storage and Indexes — File Organization – CMSC424 Lecture Notes</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -135,7 +135,40 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#introduction-storage-representations" id="toc-introduction-storage-representations" class="nav-link active" data-scroll-target="#introduction-storage-representations">1. Introduction: Storage Representations</a></li>
+  <li><a href="#file-system-vs.-direct-disk-access" id="toc-file-system-vs.-direct-disk-access" class="nav-link" data-scroll-target="#file-system-vs.-direct-disk-access">2. File System vs.&nbsp;Direct Disk Access</a>
+  <ul class="collapse">
+  <li><a href="#option-1-use-the-os-file-system" id="toc-option-1-use-the-os-file-system" class="nav-link" data-scroll-target="#option-1-use-the-os-file-system">Option 1: Use the OS File System</a></li>
+  <li><a href="#option-2-dbms-directly-manages-the-disk" id="toc-option-2-dbms-directly-manages-the-disk" class="nav-link" data-scroll-target="#option-2-dbms-directly-manages-the-disk">Option 2: DBMS Directly Manages the Disk</a></li>
+  <li><a href="#an-important-aside-controlling-writes-to-disk" id="toc-an-important-aside-controlling-writes-to-disk" class="nav-link" data-scroll-target="#an-important-aside-controlling-writes-to-disk">An Important Aside: Controlling Writes to Disk</a></li>
+  <li><a href="#a-typical-file-layout" id="toc-a-typical-file-layout" class="nav-link" data-scroll-target="#a-typical-file-layout">A Typical File Layout</a></li>
+  </ul></li>
+  <li><a href="#within-a-block-fixed-length-records" id="toc-within-a-block-fixed-length-records" class="nav-link" data-scroll-target="#within-a-block-fixed-length-records">3. Within a Block: Fixed-Length Records</a></li>
+  <li><a href="#within-a-block-variable-length-records-slotted-page" id="toc-within-a-block-variable-length-records-slotted-page" class="nav-link" data-scroll-target="#within-a-block-variable-length-records-slotted-page">4. Within a Block: Variable-Length Records (Slotted Page)</a></li>
+  <li><a href="#within-a-block-cache-optimized-layout-pax" id="toc-within-a-block-cache-optimized-layout-pax" class="nav-link" data-scroll-target="#within-a-block-cache-optimized-layout-pax">5. Within a Block: Cache-Optimized Layout (PAX)</a>
+  <ul class="collapse">
+  <li><a href="#the-problem-with-row-wise-layout-nsm" id="toc-the-problem-with-row-wise-layout-nsm" class="nav-link" data-scroll-target="#the-problem-with-row-wise-layout-nsm">The Problem with Row-Wise Layout (NSM)</a></li>
+  <li><a href="#the-pax-solution" id="toc-the-pax-solution" class="nav-link" data-scroll-target="#the-pax-solution">The PAX Solution</a></li>
+  </ul></li>
+  <li><a href="#across-blocks-file-organization" id="toc-across-blocks-file-organization" class="nav-link" data-scroll-target="#across-blocks-file-organization">6. Across Blocks: File Organization</a>
+  <ul class="collapse">
+  <li><a href="#heap-organization" id="toc-heap-organization" class="nav-link" data-scroll-target="#heap-organization">6.1 Heap Organization</a></li>
+  <li><a href="#sequential-sorted-organization" id="toc-sequential-sorted-organization" class="nav-link" data-scroll-target="#sequential-sorted-organization">6.2 Sequential (Sorted) Organization</a></li>
+  <li><a href="#hashing-organization" id="toc-hashing-organization" class="nav-link" data-scroll-target="#hashing-organization">6.3 Hashing Organization</a></li>
+  </ul></li>
+  <li><a href="#column-oriented-storage" id="toc-column-oriented-storage" class="nav-link" data-scroll-target="#column-oriented-storage">7. Column-Oriented Storage</a>
+  <ul class="collapse">
+  <li><a href="#tuple-reconstruction" id="toc-tuple-reconstruction" class="nav-link" data-scroll-target="#tuple-reconstruction">Tuple Reconstruction</a></li>
+  <li><a href="#benefits" id="toc-benefits" class="nav-link" data-scroll-target="#benefits">7.1 Benefits</a></li>
+  <li><a href="#drawbacks" id="toc-drawbacks" class="nav-link" data-scroll-target="#drawbacks">7.2 Drawbacks</a></li>
+  <li><a href="#handling-nulls-in-columnar-storage" id="toc-handling-nulls-in-columnar-storage" class="nav-link" data-scroll-target="#handling-nulls-in-columnar-storage">7.3 Handling Nulls in Columnar Storage</a></li>
+  </ul></li>
+  <li><a href="#columnar-file-representations-parquet-orc-and-friends" id="toc-columnar-file-representations-parquet-orc-and-friends" class="nav-link" data-scroll-target="#columnar-file-representations-parquet-orc-and-friends">8. Columnar File Representations: Parquet, ORC, and Friends</a>
+  <ul class="collapse">
+  <li><a href="#problems-with-csv-and-json" id="toc-problems-with-csv-and-json" class="nav-link" data-scroll-target="#problems-with-csv-and-json">Problems with CSV and JSON</a></li>
+  <li><a href="#columnar-file-formats" id="toc-columnar-file-formats" class="nav-link" data-scroll-target="#columnar-file-formats">Columnar File Formats</a></li>
+  </ul></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">9. Summary</a></li>
   </ul>
 </nav>
     </div>
@@ -144,7 +177,7 @@ ul.task-list li input[type="checkbox"] {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Lecture 1: Introduction</h1>
+<h1 class="title">CMSC424: Storage and Indexes — File Organization</h1>
 </div>
 
 
@@ -161,9 +194,315 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<section id="overview" class="level1">
-<h1>Overview</h1>
-<p>Content for Lecture 1…</p>
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction-storage-representations" class="level2">
+<h2 class="anchored" data-anchor-id="introduction-storage-representations">1. Introduction: Storage Representations</h2>
+<p>In the previous set of notes, we examined the hardware that underlies database systems — the storage hierarchy from CPU caches to hard disks, and the enormous performance gaps between each level. We now turn to a more concrete question: <strong>how do we map tuples to blocks?</strong></p>
+<p>At the logical level, we work with tuples. We write SQL queries against relations, we think in terms of rows and columns, and we reason about schemas. But at some point, all of that data must be stored on disk (or SSD) in order to persist. The question of <em>how</em> that mapping is done — how tuples are laid out within blocks and how blocks are organized across an entire relation — turns out to have a surprisingly large impact on performance.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-026.png" class="img-fluid figure-img"></p>
+<figcaption>Mapping Tuples to Blocks</figcaption>
+</figure>
+</div>
+<p>This is part of the reason why systems like PostgreSQL are fundamentally limited in exploiting modern hardware. PostgreSQL was built over 30 years ago and was not designed for the hardware we have today — it used to be a single-threaded system and could not even use multiple threads. In contrast, modern systems like DuckDB are built from scratch to exploit current hardware: they use vectorized execution, compilation techniques, and carefully chosen storage layouts to extract maximum performance. Even something as seemingly simple as how you arrange tuples on disk can make a dramatic difference.</p>
+<p>There are two separate issues we need to address:</p>
+<ol type="1">
+<li><strong>Within a block</strong>: How do we lay out tuples (or sub-tuples) inside a single disk block or memory page? This is relatively straightforward and primarily impacts cache performance.</li>
+<li><strong>Across blocks</strong>: Given that a relation spans many blocks, which block should a particular tuple go to? This involves more significant trade-offs — for example, keeping data sorted makes searching faster but makes insertions harder, while columnar storage enables better scans but makes tuple reconstruction expensive.</li>
+</ol>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-030.png" class="img-fluid figure-img"></p>
+<figcaption>Two Separate Issues</figcaption>
+</figure>
+</div>
+<p>No single strategy works optimally for all types of queries. The best layout depends on the workload: a point lookup (<code>SELECT * FROM R WHERE id = 100</code>) benefits from sorted or hashed organization, while an analytical scan (<code>SELECT A, B FROM R</code>) benefits from columnar storage. Database system design is fundamentally about navigating these trade-offs.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-028.png" class="img-fluid figure-img"></p>
+<figcaption>Common Query Patterns</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="file-system-vs.-direct-disk-access" class="level2">
+<h2 class="anchored" data-anchor-id="file-system-vs.-direct-disk-access">2. File System vs.&nbsp;Direct Disk Access</h2>
+<p>Before we discuss how data is laid out, we need to address a preliminary question: should the database system use the operating system’s file system, or should it bypass the OS and work directly with the disk?</p>
+<section id="option-1-use-the-os-file-system" class="level3">
+<h3 class="anchored" data-anchor-id="option-1-use-the-os-file-system">Option 1: Use the OS File System</h3>
+<p>The standard approach today is for the database to use the operating system’s file system. The database allocates a large file on disk — perhaps starting at a gigabyte — and then manages the blocks within that file itself. The file is essentially treated as a contiguous sequence of blocks: the database zeros it out initially and then places data into specific blocks as needed. PostgreSQL works this way, and it makes the assumption that the file is contiguous on disk (though the OS may fragment it in practice).</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-044.png" class="img-fluid figure-img"></p>
+<figcaption>File System or Not</figcaption>
+</figure>
+</div>
+<p>The major disadvantage of this approach is that the database system does not have control over physical placement on disk. The operating system decides where the file’s blocks actually reside, and it may spread them across the disk in ways that are suboptimal for the database’s access patterns.</p>
+<p>Within the file system approach, there are further choices. One option is to allocate a single large file for the entire database and manage all relations within it — this is what PostgreSQL does. Another option is to use a separate file for each relation, which is the approach taken by SQLite and MySQL. Either way, the result is the same at a conceptual level: a set of relations mapped to a set of blocks on disk.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-045.png" class="img-fluid figure-img"></p>
+<figcaption>Through a File System</figcaption>
+</figure>
+</div>
+</section>
+<section id="option-2-dbms-directly-manages-the-disk" class="level3">
+<h3 class="anchored" data-anchor-id="option-2-dbms-directly-manages-the-disk">Option 2: DBMS Directly Manages the Disk</h3>
+<p>In the older days, high-performance database systems bypassed the operating system entirely and worked directly with the disk hardware. This gave them complete control over physical placement, allowing them to optimize for sequential access patterns and minimize seek times. Today this approach is increasingly uncommon — most database systems run on top of operating systems, on cloud VMs, or on distributed file systems like HDFS, making direct disk access impractical. However, truly high-performance systems may still use something like this to squeeze out the last bit of performance.</p>
+<p>One positive development is that modern operating systems have become more efficient and now provide more knobs for applications to control I/O behavior, making the lack of direct disk access less of a problem than it used to be.</p>
+</section>
+<section id="an-important-aside-controlling-writes-to-disk" class="level3">
+<h3 class="anchored" data-anchor-id="an-important-aside-controlling-writes-to-disk">An Important Aside: Controlling Writes to Disk</h3>
+<p>One issue that we will revisit when we discuss transactions is that database systems need to control <strong>when</strong> data is written back to disk. The operating system’s buffer manager moves data between memory and disk automatically, but the database system requires guarantees about the <em>order</em> in which writes happen. Without those guarantees, the database cannot ensure the ACID properties — specifically, it cannot guarantee atomicity and durability of transactions. This is a significant concern that has driven some systems to bypass the OS buffer manager entirely.</p>
+</section>
+<section id="a-typical-file-layout" class="level3">
+<h3 class="anchored" data-anchor-id="a-typical-file-layout">A Typical File Layout</h3>
+<p>Assuming we use the file system approach, a database file might look something like this: a pre-allocated region of disk blocks, initially empty, with different portions allocated to different relations and indexes as data is inserted.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-029.png" class="img-fluid figure-img"></p>
+<figcaption>File Layout Example</figcaption>
+</figure>
+</div>
+<p>Some blocks hold instructor tuples, others hold student tuples, and still others hold B+-tree index nodes. As new tuples are inserted, they fill into the appropriate regions. Updates to the data may also trigger updates to associated indexes. There is typically some empty space reserved for growth.</p>
+<hr>
+</section>
+</section>
+<section id="within-a-block-fixed-length-records" class="level2">
+<h2 class="anchored" data-anchor-id="within-a-block-fixed-length-records">3. Within a Block: Fixed-Length Records</h2>
+<p>The simplest case for within-block layout is when all records have the same fixed length. If each record is <em>n</em> bytes, then record <em>i</em> is stored at byte position <em>n × (i − 1)</em> within the block. This makes it trivial to locate any record by its position number.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-031.png" class="img-fluid figure-img"></p>
+<figcaption>Fixed-Length Records</figcaption>
+</figure>
+</div>
+<p>A few practical considerations arise:</p>
+<ul>
+<li><p><strong>Records should not cross block boundaries.</strong> If a record would span two blocks, it is better to waste a little space at the end of the first block and start the record at the beginning of the next one. This avoids the complexity and performance cost of reading two blocks to retrieve a single record.</p></li>
+<li><p><strong>Inserting a tuple</strong> can be as simple as appending it at the end of the available space in the block, or it can follow a specific policy depending on the file organization (e.g., maintaining sorted order).</p></li>
+<li><p><strong>Deleting a tuple</strong> is more interesting. There are two common approaches:</p>
+<ol type="1">
+<li><strong>Rearrange</strong>: shift the remaining records to fill the gap left by the deleted record. This keeps the block compact but requires moving data.</li>
+<li><strong>Free list</strong>: leave the deleted slot in place and maintain a linked list of free slots. The block header stores a pointer to the first free slot, and each free slot contains a pointer to the next one. When a new record needs to be inserted, the system follows the free list to find an available slot.</li>
+</ol></li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-032.png" class="img-fluid figure-img"></p>
+<figcaption>Deletion with Free Lists</figcaption>
+</figure>
+</div>
+<p>The free list approach is generally preferred because it avoids the cost of shifting records around. It is worth noting that the within-block layout does not significantly affect disk-to-memory transfer performance — the entire block is read into memory regardless of how the records are arranged within it. However, the layout <em>does</em> matter for CPU and cache performance once the block is in memory.</p>
+<hr>
+</section>
+<section id="within-a-block-variable-length-records-slotted-page" class="level2">
+<h2 class="anchored" data-anchor-id="within-a-block-variable-length-records-slotted-page">4. Within a Block: Variable-Length Records (Slotted Page)</h2>
+<p>In practice, most records are not fixed-length. Relations commonly include <code>VARCHAR</code>, <code>TEXT</code>, or other variable-length fields, which means records within the same relation can have different sizes. The standard approach for handling this is the <strong>slotted page</strong> (or slotted block) structure.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-033.png" class="img-fluid figure-img"></p>
+<figcaption>Slotted Page Structure</figcaption>
+</figure>
+</div>
+<p>A slotted page has three regions:</p>
+<ol type="1">
+<li><strong>Block header</strong>: located at the beginning of the block, it contains the number of record entries and an array of (offset, size) pairs — one for each record currently stored in the block. It also tracks where the free space ends.</li>
+<li><strong>Free space</strong>: an open region in the middle of the block.</li>
+<li><strong>Records</strong>: stored starting from the <em>end</em> of the block, growing toward the header.</li>
+</ol>
+<p>Records grow from the end toward the beginning, while the header’s slot array grows from the beginning toward the end. The free space sits between them and shrinks as records are added.</p>
+<p>The key property of the slotted page structure is <strong>indirection</strong>. External references to a record use the form “page X, slot 5” — they point to an entry in the slot array, not to the record’s actual byte offset. This means that records can be moved around within the page (for example, to compact free space) without invalidating any external pointers. The slot array is updated to reflect the new positions, but the outside world is oblivious to the change. This indirection mechanism is used by virtually all modern database systems.</p>
+<hr>
+</section>
+<section id="within-a-block-cache-optimized-layout-pax" class="level2">
+<h2 class="anchored" data-anchor-id="within-a-block-cache-optimized-layout-pax">5. Within a Block: Cache-Optimized Layout (PAX)</h2>
+<p>Even though the within-block layout does not affect disk I/O performance (since the whole block is read at once), it has a significant impact on <strong>CPU cache performance</strong>. This matters because once a block is in memory, the CPU must process it, and cache misses can be surprisingly expensive.</p>
+<section id="the-problem-with-row-wise-layout-nsm" class="level3">
+<h3 class="anchored" data-anchor-id="the-problem-with-row-wise-layout-nsm">The Problem with Row-Wise Layout (NSM)</h3>
+<p>The traditional approach is called the <strong>N-ary Storage Model (NSM)</strong>: entire tuples are stored contiguously within a block. Record 1 is followed immediately by record 2, and so on, with all attributes of each record stored together.</p>
+<p>Consider a query like <code>SELECT name FROM R WHERE age &lt; 40</code>. When the database scans a block, it loads the block into the CPU cache. But because tuples are stored row-wise, each cache line contains a mixture of <em>all</em> attributes — name, age, salary, department, and so on. The query only needs <code>name</code> and <code>age</code>, so most of the data brought into the cache is useless. This results in a high rate of <strong>cache misses</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-034.png" class="img-fluid figure-img"></p>
+<figcaption>NSM and Cache Behavior</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-pax-solution" class="level3">
+<h3 class="anchored" data-anchor-id="the-pax-solution">The PAX Solution</h3>
+<p><strong>PAX (Partition Attributes Across)</strong> addresses this by reorganizing data <em>within</em> each block into a columnar layout. Instead of storing complete tuples one after another, PAX divides the block into “mini-pages,” one per attribute. All the <code>name</code> values for tuples in this block are stored together, all the <code>age</code> values are stored together, and so on.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-035.png" class="img-fluid figure-img"></p>
+<figcaption>PAX and Cache Behavior</figcaption>
+</figure>
+</div>
+<p>Now when the query scans the <code>age</code> values, they are contiguous in memory, so the cache lines are fully utilized — every byte loaded into the cache is relevant to the query. The improvement in cache performance can be substantial.</p>
+<p>It is important to understand that PAX is a <strong>within-block</strong> optimization. The same tuples reside in the same block as they would under NSM; only the layout <em>within</em> the block changes. This is in contrast to full column-oriented storage (discussed in Section 7), which stores entire columns across many blocks. PAX gives you the cache benefits of columnar layout without changing the across-block organization.</p>
+<hr>
+</section>
+</section>
+<section id="across-blocks-file-organization" class="level2">
+<h2 class="anchored" data-anchor-id="across-blocks-file-organization">6. Across Blocks: File Organization</h2>
+<p>We now turn to the second major question: given that a relation spans many blocks (potentially thousands or millions), which block should a particular tuple go to? There are three fundamental approaches.</p>
+<section id="heap-organization" class="level3">
+<h3 class="anchored" data-anchor-id="heap-organization">6.1 Heap Organization</h3>
+<p>The simplest approach is <strong>heap organization</strong>: place each new tuple wherever there is available space. There are no guarantees about the ordering of tuples across blocks.</p>
+<p>The advantage is simplicity — insertions are fast because the system just finds any block with free space. The disadvantage is that searching for a specific tuple requires scanning all blocks of the relation, since there is no way to know which block contains a given value. For large relations, this is prohibitively expensive.</p>
+</section>
+<section id="sequential-sorted-organization" class="level3">
+<h3 class="anchored" data-anchor-id="sequential-sorted-organization">6.2 Sequential (Sorted) Organization</h3>
+<p>A more structured approach is <strong>sequential organization</strong>: keep the tuples sorted by some search key, typically the primary key. Block 1 contains the tuples with the smallest key values, block 2 contains the next range, and so on.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-036.png" class="img-fluid figure-img"></p>
+<figcaption>Across Blocks: Three Approaches</figcaption>
+</figure>
+</div>
+<p>The benefit of sorted organization is that it enables <strong>binary search</strong>. If you are looking for a tuple with a specific key value, you can jump to the middle of the relation’s blocks, compare, and narrow the search by half with each step. For a relation spanning <em>n</em> blocks, binary search requires log₂(<em>n</em>) block accesses.</p>
+<p>However, binary search on disk is still too slow for practical purposes. Consider a relation with one million blocks (roughly 4 GB of data). Binary search requires log₂(1,000,000) ≈ 20 block accesses. Since each random disk access takes approximately 10 milliseconds, that is 200 milliseconds for a single lookup — meaning the system can handle only about 5 queries per second. That is unacceptably slow, especially given that the disk is fully occupied just performing these reads.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-038.png" class="img-fluid figure-img"></p>
+<figcaption>Binary Search Cost</figcaption>
+</figure>
+</div>
+<p>The solution is to use <strong>indexes</strong> — specifically, B+-trees — which reduce the number of block accesses from 20 to just 3 or 4 by narrowing the search range by a factor of 100 at each level instead of just 2. We cover B+-trees in detail in the next set of notes.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-037.png" class="img-fluid figure-img"></p>
+<figcaption>Sequential File Organization</figcaption>
+</figure>
+</div>
+<p>Sorted organization also creates challenges for <strong>insertions</strong>. When a new tuple arrives, it belongs in a specific position to maintain the sort order. But the target block may already be full. The typical solution is to create an <strong>overflow page</strong> linked to the full block. Over time, if too many overflow pages accumulate, the system must stop and <strong>reorganize</strong> the entire relation — re-sorting and redistributing tuples across blocks. This reorganization is expensive and requires the system to pause, so it is done infrequently.</p>
+<p><strong>Deletions</strong> are handled simply by leaving the freed space in place. Since insertions tend to be more common than deletions in most workloads, the free space gets reused quickly.</p>
+</section>
+<section id="hashing-organization" class="level3">
+<h3 class="anchored" data-anchor-id="hashing-organization">6.3 Hashing Organization</h3>
+<p>The third approach uses a <strong>hash function</strong> to determine which block a tuple belongs to. For example, if the relation occupies 100 blocks and the search key is <code>ID</code>, we might compute <code>H(ID) mod 100</code> to determine the block number. Each block can hold multiple tuples (say, 50), so hash collisions are expected and handled naturally within the block.</p>
+<p>The major advantage is that <strong>equality lookups are extremely fast</strong>: to find the tuple with <code>ID = 397</code>, simply compute the hash, go directly to the correct block, and scan within it. There is no need for binary search or index traversal.</p>
+<p>The major disadvantage is that <strong>range queries are essentially impossible</strong>. If you want all instructors with IDs between 90 and 102, there is no way to exploit the hash structure — you would have to compute and look up every possible ID value individually, which is impractical. This limitation makes hashing unsuitable as a general-purpose on-disk organization for most database workloads, where range queries are common.</p>
+<p>As with sorted organization, full blocks must be handled with overflow pages. We discuss hash-based approaches in more detail in the indexes notes.</p>
+<hr>
+</section>
+</section>
+<section id="column-oriented-storage" class="level2">
+<h2 class="anchored" data-anchor-id="column-oriented-storage">7. Column-Oriented Storage</h2>
+<p>All of the organizations discussed so far store data <strong>row by row</strong>: each block contains complete tuples (or nearly complete tuples, in the case of PAX). An increasingly popular alternative is to store data <strong>column by column</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-039.png" class="img-fluid figure-img"></p>
+<figcaption>Column-Oriented Storage</figcaption>
+</figure>
+</div>
+<p>In column-oriented (or columnar) storage, each block contains values from only a <strong>single column</strong>. One block holds all the employee numbers, another block holds all the employee names, another holds all the job titles, and so on. A single column may span many blocks, but each block itself contains data from only one attribute.</p>
+<p>This is similar in spirit to PAX, but applied at a much larger scale. PAX reorganizes data within a single block; column-oriented storage reorganizes data across the <strong>entire relation</strong>. The distinction is important: PAX keeps the same tuples in the same blocks and only changes the within-block layout, while columnar storage fundamentally changes which data lives in which block.</p>
+<section id="tuple-reconstruction" class="level3">
+<h3 class="anchored" data-anchor-id="tuple-reconstruction">Tuple Reconstruction</h3>
+<p>The most important challenge with columnar storage is: <strong>how do you reconstruct a specific tuple?</strong> If the employee number is in one block, the name in another, and the salary in yet another, how do you put them back together?</p>
+<p>The answer is that <strong>positions matter</strong>. The first entry in each column corresponds to the same tuple, the second entry corresponds to the second tuple, and so on. To reconstruct tuple number 3, the system reads the third entry from each column. The positions cannot be rearranged independently — they must remain synchronized across all columns.</p>
+<p>This means that reading a single tuple is actually quite expensive. If the relation has 5 columns, reconstructing one tuple requires reading 5 different blocks (one from each column), whereas in row-oriented storage, it would require reading just 1 block. This is a significant cost.</p>
+</section>
+<section id="benefits" class="level3">
+<h3 class="anchored" data-anchor-id="benefits">7.1 Benefits</h3>
+<p>Despite the tuple reconstruction cost, columnar storage offers several compelling advantages:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-040.png" class="img-fluid figure-img"></p>
+<figcaption>Column-Oriented Benefits</figcaption>
+</figure>
+</div>
+<ul>
+<li><p><strong>Reduced I/O</strong>: Most analytical queries access only a few columns. It is not uncommon to see tables with 20 or 30 columns where each query touches only 2 or 3 of them. With columnar storage, only the relevant columns need to be read from disk, potentially reducing I/O by an order of magnitude.</p></li>
+<li><p><strong>Better CPU cache performance</strong>: For the same reason that PAX improves cache utilization — data of the same type is stored contiguously, so cache lines are fully utilized when scanning a column.</p></li>
+<li><p><strong>Better compression</strong>: When each block contains data of a single type (all integers, or all short strings), compression algorithms can achieve much higher ratios than when a block contains a mixture of types. This further reduces I/O.</p></li>
+<li><p><strong>Better utilization of modern CPUs</strong>: Modern processors include SIMD (Single Instruction, Multiple Data) instructions that can operate on vectors of values simultaneously. Columnar data is naturally suited to vectorized processing, enabling significant speedups.</p></li>
+</ul>
+</section>
+<section id="drawbacks" class="level3">
+<h3 class="anchored" data-anchor-id="drawbacks">7.2 Drawbacks</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-041.png" class="img-fluid figure-img"></p>
+<figcaption>Column-Oriented Drawbacks</figcaption>
+</figure>
+</div>
+<ul>
+<li><p><strong>Tuple reconstruction is expensive</strong>: As discussed above, reading a single complete tuple requires accessing multiple blocks. A <code>SELECT *</code> query on a 50-column table is extremely expensive with columnar storage.</p></li>
+<li><p><strong>Updates and deletes are hard</strong>: Modifying a single tuple requires updating multiple blocks (one per column). This makes columnar storage poorly suited for workloads with frequent updates.</p></li>
+<li><p><strong>Decompression cost</strong>: If data is compressed (as it typically is), there is a CPU cost to decompress it before processing.</p></li>
+</ul>
+<p>Despite these drawbacks, columnar storage has become the dominant approach for <strong>data warehouses and analytical workloads</strong>. Systems like Snowflake, Amazon Redshift, and ClickHouse all use columnar storage. The trade-off is clear: reading individual tuples is expensive, but analytical queries that scan large volumes of data across a few columns are dramatically faster. Since data warehouse workloads are characterized by large scans and infrequent updates, the trade-off is overwhelmingly favorable.</p>
+<p>In contrast, transactional systems like PostgreSQL continue to use row-oriented storage because their workloads involve frequent updates and lookups of individual tuples. Hybrid approaches that attempt to combine the best of both worlds have been tried, but they have not been particularly successful — this remains an open research question.</p>
+</section>
+<section id="handling-nulls-in-columnar-storage" class="level3">
+<h3 class="anchored" data-anchor-id="handling-nulls-in-columnar-storage">7.3 Handling Nulls in Columnar Storage</h3>
+<p>A natural question that arises with columnar storage is: what happens when a value is null? Since positions must remain aligned across columns, you cannot simply skip a null value. There are two common approaches:</p>
+<ol type="1">
+<li><strong>Store the null explicitly</strong>: use a sentinel value or a null marker at the appropriate position. This is simple but wastes space if nulls are common.</li>
+<li><strong>Use a bit array</strong>: maintain a separate bitmap for each column, with one bit per position indicating whether the value is null. This is more space-efficient when nulls are frequent, as the bitmap is much smaller than the actual data values it replaces.</li>
+</ol>
+<p>Modern data warehouse systems use sophisticated variations of these techniques — along with many other optimizations — to extract the best possible performance. Hundreds of papers have been written on optimizing columnar storage.</p>
+<hr>
+</section>
+</section>
+<section id="columnar-file-representations-parquet-orc-and-friends" class="level2">
+<h2 class="anchored" data-anchor-id="columnar-file-representations-parquet-orc-and-friends">8. Columnar File Representations: Parquet, ORC, and Friends</h2>
+<p>The ideas behind column-oriented storage extend beyond databases into the world of <strong>file formats</strong> for data storage. Many data-intensive applications store data in flat files rather than in a database, and the same row-vs-column trade-offs apply.</p>
+<section id="problems-with-csv-and-json" class="level3">
+<h3 class="anchored" data-anchor-id="problems-with-csv-and-json">Problems with CSV and JSON</h3>
+<p>CSV files are the most common format for tabular data exchange, and they work well for small datasets. But at scale — millions or billions of records — CSV files have several significant problems:</p>
+<ol type="1">
+<li><strong>Text is inefficient</strong>: numbers, dates, and other structured data are stored as human-readable text, which takes far more space than a binary representation.</li>
+<li><strong>Parsing is expensive</strong>: every time the data is read, each field must be parsed and converted from text to its internal representation (a process called deserialization). This CPU cost adds up quickly at scale.</li>
+<li><strong>Row-based layout</strong>: CSV files store data row by row, which means reading a single column requires scanning the entire file.</li>
+</ol>
+<p>JSON files share all of these problems, with the additional overhead of key names repeated for every record.</p>
+</section>
+<section id="columnar-file-formats" class="level3">
+<h3 class="anchored" data-anchor-id="columnar-file-formats">Columnar File Formats</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-042.png" class="img-fluid figure-img"></p>
+<figcaption>Columnar File Representations</figcaption>
+</figure>
+</div>
+<p>Several file formats have been developed to address these issues. The most widely used today is <strong>Apache Parquet</strong>, but <strong>ORC</strong> (Optimized Row Columnar), <strong>Avro</strong>, <strong>Arrow</strong>, and <strong>Protocol Buffers</strong> serve similar purposes. They share three key design principles:</p>
+<ol type="1">
+<li><strong>Columnar layout</strong>: data is stored column by column, enabling efficient reads of individual columns.</li>
+<li><strong>Binary compressed representation</strong>: data is stored in a compact binary format with compression applied per column chunk, dramatically reducing storage and I/O.</li>
+<li><strong>No deserialization overhead</strong>: the format is designed so that data can be read directly into memory structures without a separate parsing step.</li>
+</ol>
+<p>Parquet files are extremely common in modern data infrastructure. If you work with any system that processes significant volumes of data, you are likely using Parquet files — even if you do not realize it, since libraries like Python’s Pandas can read and write Parquet transparently.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-043.png" class="img-fluid figure-img"></p>
+<figcaption>ORC Format Structure</figcaption>
+</figure>
+</div>
+<p>Modern <strong>data lakes</strong> — repositories of raw data files stored on distributed file systems or cloud storage — may contain thousands to millions of Parquet or ORC files. Systems like Apache Spark and Databricks provide the ability to run SQL queries directly over these files, combining the flexibility of file-based storage with the querying power of SQL. In fact, this is Databricks’ central value proposition: enabling SQL-style analytics over large collections of Parquet files without requiring a traditional database.</p>
+<hr>
+</section>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">9. Summary</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="storage-indexes-pngs/page-046.png" class="img-fluid figure-img"></p>
+<figcaption>Summary</figcaption>
+</figure>
+</div>
+<p>Storage layout decisions are an important consideration in database system design, particularly given the data sizes we encounter in practice. Small changes in how tuples are organized can have enormous effects on query performance.</p>
+<p>The primary design decision is <strong>row versus column representation</strong>:</p>
+<ul>
+<li><strong>Row-oriented storage</strong> is better for transactional systems where individual tuple lookups and updates are the dominant operations. PostgreSQL uses row storage because its typical use case is as a backend for web applications, where updates are frequent.</li>
+<li><strong>Column-oriented storage</strong> is better for analytical and data warehouse workloads, where queries scan large amounts of data but touch only a few columns. Systems like Snowflake, Amazon Redshift, and Databricks/Spark are built around columnar storage.</li>
+<li><strong>Hybrid representations</strong> have been attempted — trying to get the benefits of both — but they have not been particularly successful. This remains an open research question.</li>
+</ul>
+<p>Beyond the row-vs-column choice, there are many secondary considerations: sort orders and hashing for across-block organization, cache-optimized layouts like PAX for within-block performance, and file formats like Parquet for efficient data interchange. These same issues arise for non-relational data as well — document stores face similar trade-offs, and even data processing libraries like Pandas have incorporated some of these ideas in recent years.</p>
 
 
 </section>
