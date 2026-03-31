@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Query Processing — Selection and Join Implementations – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">1. Introduction</a></li>
+  <li><a href="#selection-sequential-scan" id="toc-selection-sequential-scan" class="nav-link" data-scroll-target="#selection-sequential-scan">2. Selection: Sequential Scan</a>
+  <ul class="collapse">
+  <li><a href="#basic-implementation" id="toc-basic-implementation" class="nav-link" data-scroll-target="#basic-implementation">Basic Implementation</a></li>
+  <li><a href="#parameterization" id="toc-parameterization" class="nav-link" data-scroll-target="#parameterization">Parameterization</a></li>
+  <li><a href="#cost" id="toc-cost" class="nav-link" data-scroll-target="#cost">Cost</a></li>
+  </ul></li>
+  <li><a href="#selection-using-a-b-tree-index" id="toc-selection-using-a-b-tree-index" class="nav-link" data-scroll-target="#selection-using-a-b-tree-index">3. Selection: Using a B+-Tree Index</a>
+  <ul class="collapse">
+  <li><a href="#implementation" id="toc-implementation" class="nav-link" data-scroll-target="#implementation">Implementation</a></li>
+  <li><a href="#cost-1" id="toc-cost-1" class="nav-link" data-scroll-target="#cost-1">Cost</a></li>
+  <li><a href="#secondary-indexes-and-their-cost" id="toc-secondary-indexes-and-their-cost" class="nav-link" data-scroll-target="#secondary-indexes-and-their-cost">Secondary Indexes and Their Cost</a></li>
+  </ul></li>
+  <li><a href="#selection-other-index-structures-and-range-queries" id="toc-selection-other-index-structures-and-range-queries" class="nav-link" data-scroll-target="#selection-other-index-structures-and-range-queries">4. Selection: Other Index Structures and Range Queries</a>
+  <ul class="collapse">
+  <li><a href="#lsm-trees" id="toc-lsm-trees" class="nav-link" data-scroll-target="#lsm-trees">LSM Trees</a></li>
+  <li><a href="#range-selections" id="toc-range-selections" class="nav-link" data-scroll-target="#range-selections">Range Selections</a></li>
+  <li><a href="#multi-attribute-selections" id="toc-multi-attribute-selections" class="nav-link" data-scroll-target="#multi-attribute-selections">Multi-Attribute Selections</a></li>
+  </ul></li>
+  <li><a href="#joins-overview-and-nested-loops" id="toc-joins-overview-and-nested-loops" class="nav-link" data-scroll-target="#joins-overview-and-nested-loops">5. Joins: Overview and Nested Loops</a>
+  <ul class="collapse">
+  <li><a href="#nested-loops-join" id="toc-nested-loops-join" class="nav-link" data-scroll-target="#nested-loops-join">Nested Loops Join</a></li>
+  </ul></li>
+  <li><a href="#index-nested-loops-join" id="toc-index-nested-loops-join" class="nav-link" data-scroll-target="#index-nested-loops-join">6. Index Nested Loops Join</a>
+  <ul class="collapse">
+  <li><a href="#the-physical-vs-logical-operator-distinction" id="toc-the-physical-vs-logical-operator-distinction" class="nav-link" data-scroll-target="#the-physical-vs-logical-operator-distinction">The Physical vs Logical Operator Distinction</a></li>
+  <li><a href="#applicability-and-cost" id="toc-applicability-and-cost" class="nav-link" data-scroll-target="#applicability-and-cost">Applicability and Cost</a></li>
+  </ul></li>
+  <li><a href="#hash-join" id="toc-hash-join" class="nav-link" data-scroll-target="#hash-join">7. Hash Join</a>
+  <ul class="collapse">
+  <li><a href="#the-algorithm" id="toc-the-algorithm" class="nav-link" data-scroll-target="#the-algorithm">The Algorithm</a></li>
+  <li><a href="#iterator-model-implementation" id="toc-iterator-model-implementation" class="nav-link" data-scroll-target="#iterator-model-implementation">Iterator Model Implementation</a></li>
+  <li><a href="#cost-2" id="toc-cost-2" class="nav-link" data-scroll-target="#cost-2">Cost</a></li>
+  <li><a href="#properties-and-limitations" id="toc-properties-and-limitations" class="nav-link" data-scroll-target="#properties-and-limitations">Properties and Limitations</a></li>
+  </ul></li>
+  <li><a href="#hash-based-outer-joins" id="toc-hash-based-outer-joins" class="nav-link" data-scroll-target="#hash-based-outer-joins">8. Hash-Based Outer Joins</a>
+  <ul class="collapse">
+  <li><a href="#left-outer-hash-join" id="toc-left-outer-hash-join" class="nav-link" data-scroll-target="#left-outer-hash-join">8.1 Left Outer Hash Join</a></li>
+  <li><a href="#right-outer-hash-join" id="toc-right-outer-hash-join" class="nav-link" data-scroll-target="#right-outer-hash-join">8.2 Right Outer Hash Join</a></li>
+  <li><a href="#full-outer-hash-join" id="toc-full-outer-hash-join" class="nav-link" data-scroll-target="#full-outer-hash-join">8.3 Full Outer Hash Join</a></li>
+  </ul></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">9. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Query Processing — Selection and Join Implementations</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">1. Introduction</h2>
+<p>In the previous set of notes, we discussed query plans, the distinction between logical and physical operators, the materialization vs pipelining trade-off, and the iterator model. We now turn to the concrete question: <strong>how are the physical operators actually implemented?</strong></p>
+<p>We will focus on two of the most important operators: <strong>selection</strong> (finding tuples that match a condition) and <strong>join</strong> (finding matching tuple pairs across two relations). For each, we will examine multiple implementation strategies, present pseudocode using the iterator model (open/next/close), and analyze the cost in terms of disk blocks read. We will also discuss how joins are extended to handle <strong>outer joins</strong>.</p>
+<p>Throughout, we use PostgreSQL as our reference system. The pseudocode shown here closely mirrors what you would find in a real database codebase — in fact, a complete toy database implementing these operators can be written in just a few hundred lines of Python.</p>
+<hr>
+</section>
+<section id="selection-sequential-scan" class="level2">
+<h2 class="anchored" data-anchor-id="selection-sequential-scan">2. Selection: Sequential Scan</h2>
+<p>The simplest way to implement a selection is the <strong>sequential scan</strong>: read the entire relation from disk, tuple by tuple, and check each one against the predicate. This is the brute-force approach — it always works, regardless of the predicate or available indexes.</p>
+<section id="basic-implementation" class="level3">
+<h3 class="anchored" data-anchor-id="basic-implementation">Basic Implementation</h3>
+<p>Consider the query:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> person <span class="kw">WHERE</span> SSN <span class="op">=</span> <span class="st">'123'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Using the iterator model, the implementation looks like this:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">open</span>(<span class="va">self</span>):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.tableScan <span class="op">=</span> TableScan(<span class="st">"person"</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.tableScan.<span class="bu">open</span>()</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">next</span>(<span class="va">self</span>):</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> <span class="va">self</span>.tableScan.<span class="bu">next</span>()</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> t <span class="kw">is</span> EOF:</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> EOF</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> t.SSN <span class="op">==</span> <span class="st">"123"</span>:</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> t</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> close(<span class="va">self</span>):</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.tableScan.close()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-023.png" class="img-fluid figure-img"></p>
+<figcaption>Selection: Sequential Scan</figcaption>
+</figure>
+</div>
+<p>The <code>open()</code> call opens the underlying table file. The <code>next()</code> call repeatedly fetches tuples from the table scan, checking each one against the predicate. The first tuple that satisfies <code>SSN = '123'</code> is returned. If no more tuples remain, EOF is returned. The <code>close()</code> call closes the file.</p>
+</section>
+<section id="parameterization" class="level3">
+<h3 class="anchored" data-anchor-id="parameterization">Parameterization</h3>
+<p>In a real database, you would not hardcode “person” and “SSN = 123” into the operator. Instead, the selection operator is parameterized with the table name, the attribute position, the comparison operator, and the constant:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">open</span>(<span class="va">self</span>, tablename, pos, op, const):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.tableScan <span class="op">=</span> TableScan(tablename)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.tableScan.<span class="bu">open</span>()</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">next</span>(<span class="va">self</span>):</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> <span class="va">self</span>.tableScan.<span class="bu">next</span>()</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> t <span class="kw">is</span> EOF:</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> EOF</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> evaluate(op, t[pos], const):</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> t</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-024.png" class="img-fluid figure-img"></p>
+<figcaption>Parameterized Selection</figcaption>
+</figure>
+</div>
+<p>The <code>evaluate()</code> helper function handles different comparison operators (<code>=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>, <code>!=</code>) and different data types (integers, strings, dates). This is done through case branches on the operator and data type — straightforward but necessary for generality. This parameterized structure allows a single codebase to handle queries like <code>A = 5</code>, <code>A &gt; 5</code>, <code>B &lt; 'hello'</code>, and so on.</p>
+<p>In the rest of this discussion, we will not show these parameterizations explicitly, but keep in mind that the actual code is always parameterized to handle different relations, attributes, data types, and operators.</p>
+</section>
+<section id="cost" class="level3">
+<h3 class="anchored" data-anchor-id="cost">Cost</h3>
+<p>The cost of a sequential scan is straightforward:</p>
+<ul>
+<li><strong>Disk blocks read</strong>: <em>b</em>, the number of blocks in the relation</li>
+<li><strong>CPU cost</strong>: O(|relation|), since every tuple must be examined</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="selection-using-a-b-tree-index" class="level2">
+<h2 class="anchored" data-anchor-id="selection-using-a-b-tree-index">3. Selection: Using a B+-Tree Index</h2>
+<p>If a B+-tree index exists on the attribute being searched, we can use it instead of scanning the entire relation. This is dramatically faster for selective queries.</p>
+<section id="implementation" class="level3">
+<h3 class="anchored" data-anchor-id="implementation">Implementation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">open</span>(<span class="va">self</span>):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.indexScan <span class="op">=</span> BTreeLookup(index<span class="op">=</span><span class="st">"person.SSN"</span>, key<span class="op">=</span><span class="st">"123"</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.indexScan.<span class="bu">open</span>()</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">next</span>(<span class="va">self</span>):</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    rid <span class="op">=</span> <span class="va">self</span>.indexScan.<span class="bu">next</span>()</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> rid <span class="kw">is</span> EOF:</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> EOF</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    t <span class="op">=</span> FetchRecord(<span class="st">"person"</span>, rid)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> t</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> close(<span class="va">self</span>):</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.indexScan.close()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-025.png" class="img-fluid figure-img"></p>
+<figcaption>Selection with B+-Tree</figcaption>
+</figure>
+</div>
+<p>The <code>open()</code> call initializes the B+-tree lookup, which navigates from the root of the tree down to the leaf node containing the key. The <code>next()</code> call retrieves the next matching record ID from the index and fetches the corresponding tuple from the relation.</p>
+</section>
+<section id="cost-1" class="level3">
+<h3 class="anchored" data-anchor-id="cost-1">Cost</h3>
+<p>For a <strong>primary key lookup</strong> (returning exactly one tuple), the cost is:</p>
+<ul>
+<li><strong>Disk blocks read</strong>: <em>h</em> + 1, where <em>h</em> is the height of the B+-tree index</li>
+</ul>
+<p>The <em>h</em> blocks are for traversing the index from root to leaf, and the additional block is for fetching the actual tuple from the relation. For example, looking up “Mozart” in a B+-tree of height 3 requires reading 3 index blocks plus 1 data block — a total of 4 block accesses, compared to potentially thousands for a sequential scan.</p>
+</section>
+<section id="secondary-indexes-and-their-cost" class="level3">
+<h3 class="anchored" data-anchor-id="secondary-indexes-and-their-cost">Secondary Indexes and Their Cost</h3>
+<p>The situation becomes more complex with <strong>secondary indexes</strong> — indexes built on attributes other than the one the relation is sorted by. With a secondary index, the pointers from the index leaf nodes point to tuples scattered across many different blocks of the relation. Each <code>FetchRecord</code> call may require reading a different block.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-026.png" class="img-fluid figure-img"></p>
+<figcaption>Secondary Index Cost</figcaption>
+</figure>
+</div>
+<p>For example, if you are looking for all instructors with a name starting with “S” and there are two of them (Singh and Srinivasan), those two tuples might reside in completely different blocks of the relation. You would need two separate random block accesses, in addition to the index traversal.</p>
+<p>The textbook lists 7 or 8 different cases with separate cost formulas depending on whether the index is primary or secondary, whether the query is a point lookup or a range query, and so on. Rather than memorizing these formulas, the important skill is being able to <strong>reason through the process</strong>: trace the path through the index, count the block accesses needed to reach the leaf nodes, and then count the additional block accesses needed to fetch the actual tuples. Given a specific data structure, you should be able to estimate the number of block accesses.</p>
+<p>A practical takeaway: <strong>range queries with secondary indexes are usually a bad idea</strong>. Because the matching tuples are scattered across the relation, each one requires a random block access. If the range is large enough, it may actually be faster to just do a sequential scan of the entire relation.</p>
+<hr>
+</section>
+</section>
+<section id="selection-other-index-structures-and-range-queries" class="level2">
+<h2 class="anchored" data-anchor-id="selection-other-index-structures-and-range-queries">4. Selection: Other Index Structures and Range Queries</h2>
+<section id="lsm-trees" class="level3">
+<h3 class="anchored" data-anchor-id="lsm-trees">LSM Trees</h3>
+<p>If the database uses a <strong>log-structured merge tree</strong> (LSM tree) instead of a B+-tree, the cost calculation is quite different. Recall from our earlier discussion that an LSM tree stores data in a series of sorted runs at different levels, with an in-memory SSTable at the top. To look up a key:</p>
+<ol type="1">
+<li>First check the in-memory SSTable — if the key is found, we are done (no disk I/O).</li>
+<li>If not found in memory, search through the disk-level sorted runs, starting from the most recent.</li>
+</ol>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-027.png" class="img-fluid figure-img"></p>
+<figcaption>LSM Tree Cost</figcaption>
+</figure>
+</div>
+<p>Estimating the cost requires estimating the probability of finding the key at each level and the number of sorted runs that must be checked. Bloom filters help reduce unnecessary disk reads, but the calculation is more complex than for B+-trees. The key point is that <strong>each index structure requires its own cost model</strong> — you cannot simply apply the B+-tree formula to an LSM tree.</p>
+</section>
+<section id="range-selections" class="level3">
+<h3 class="anchored" data-anchor-id="range-selections">Range Selections</h3>
+<p>Range queries (e.g., <code>SELECT * FROM accounts WHERE balance &gt; 100000</code>) are very common in practice. The sequential scan can always handle them. A B+-tree index can also be used — navigate to the starting point of the range and then follow the leaf-level linked list. However, a <strong>hash index cannot be used for range queries</strong>, since hashing destroys ordering.</p>
+</section>
+<section id="multi-attribute-selections" class="level3">
+<h3 class="anchored" data-anchor-id="multi-attribute-selections">Multi-Attribute Selections</h3>
+<p>Queries with conditions on multiple attributes (e.g., <code>A = 1 AND B = 2</code>) can be handled in several ways:</p>
+<ul>
+<li><strong>Sequential scan</strong>: always works, checks both conditions for each tuple</li>
+<li><strong>Use one index</strong>: if an index on A exists, use it to find tuples with <code>A = 1</code>, then check <code>B = 2</code> in memory for each result</li>
+<li><strong>Index-ANDing</strong>: if indexes exist on both A and B, retrieve the set of record IDs from each index and intersect them, then fetch only the tuples in the intersection</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-028.png" class="img-fluid figure-img"></p>
+<figcaption>Range and Multi-Attribute Selections</figcaption>
+</figure>
+</div>
+<p>Index-ANDing does not require a separate operator — it can be done as part of the index operator itself.</p>
+<hr>
+</section>
+</section>
+<section id="joins-overview-and-nested-loops" class="level2">
+<h2 class="anchored" data-anchor-id="joins-overview-and-nested-loops">5. Joins: Overview and Nested Loops</h2>
+<p>The <strong>join</strong> is one of the most important and expensive operations in a relational database. The goal is to find all pairs of matching tuples between two relations. We primarily discuss <strong>equi-joins</strong> (where the condition is <code>R.a = S.a</code>), though the algorithms can also handle non-equi-join conditions like <code>|R.a - S.a| &lt; 0.5</code>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-029.png" class="img-fluid figure-img"></p>
+<figcaption>Joins Overview</figcaption>
+</figure>
+</div>
+<section id="nested-loops-join" class="level3">
+<h3 class="anchored" data-anchor-id="nested-loops-join">Nested Loops Join</h3>
+<p>The simplest join algorithm is the <strong>nested loops join</strong>: for each tuple in R, scan the entire relation S and check the join condition for every pair.</p>
+<pre><code>for each tuple r in R:
+    for each tuple s in S:
+        if r.a == s.a:
+            output (r, s)</code></pre>
+<p>The cost of this algorithm is O(N_R × N_S), where N_R and N_S are the number of tuples in R and S respectively. With even moderately sized relations — say, 10,000 tuples each — this produces 100 million comparisons. Modern laptops can handle a million operations quickly, but 100 million will cause a noticeable wait. And real database relations often contain millions of tuples, making nested loops completely impractical.</p>
+<p>Despite this, nested loops join does exist in every database implementation. The system uses it only when it is confident that one of the relations is <strong>very small</strong> — typically just a few tuples. This situation is surprisingly common: even if the base relation has millions of tuples, a selection condition like <code>R.B = 10</code> might reduce it to just 5 tuples, making nested loops with the other relation perfectly feasible.</p>
+<hr>
+</section>
+</section>
+<section id="index-nested-loops-join" class="level2">
+<h2 class="anchored" data-anchor-id="index-nested-loops-join">6. Index Nested Loops Join</h2>
+<p>If an index exists on the join attribute of one relation, we can do much better than a full nested loops scan. The <strong>index nested loops join</strong> uses the index to find matching tuples directly, rather than scanning the entire inner relation for each outer tuple.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-030.png" class="img-fluid figure-img"></p>
+<figcaption>Index Nested Loops Join</figcaption>
+</figure>
+</div>
+<pre><code>for each tuple r in R:
+    use the index on S.a to find all S tuples where S.a = r.a</code></pre>
+<p>For each tuple in R, instead of scanning all of S, we perform an <strong>index lookup</strong> on S. If the index is a B+-tree, this costs just a few block accesses per R tuple, compared to reading all of S.</p>
+<section id="the-physical-vs-logical-operator-distinction" class="level3">
+<h3 class="anchored" data-anchor-id="the-physical-vs-logical-operator-distinction">The Physical vs Logical Operator Distinction</h3>
+<p>An interesting subtlety arises when examining PostgreSQL’s <code>EXPLAIN</code> output. PostgreSQL may report a “Nested Loop” join, but if you look at the inputs, one of them is an <strong>index scan</strong> rather than a sequential scan. This means the physical operator is technically an index nested loops join, even though PostgreSQL labels it as a nested loop. The key is to look at what the inner input is: if it is a table scan, it is a true nested loops join; if it is an index scan, it is an index nested loops join.</p>
+</section>
+<section id="applicability-and-cost" class="level3">
+<h3 class="anchored" data-anchor-id="applicability-and-cost">Applicability and Cost</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-031.png" class="img-fluid figure-img"></p>
+<figcaption>Index Nested Loops Properties</figcaption>
+</figure>
+</div>
+<p>Index nested loops join has <strong>restricted applicability</strong>: an appropriate index must exist on the join attribute, and it works best for equi-joins. For non-equi-join conditions like <code>|R.a - S.a| &lt; 5</code>, using an index is possible but the databases typically do not implement this optimization.</p>
+<p>The algorithm is particularly effective for queries that combine a <strong>join with a selective condition</strong>. For example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> accounts, customers</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> accounts.customer_SSN <span class="op">=</span> customers.customer_SSN</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> accounts.acct_number <span class="op">=</span> <span class="st">'A-101'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The selection <code>acct_number = 'A-101'</code> reduces the accounts relation to just one tuple. The index nested loops join then needs only a single index lookup on <code>customers</code> — extremely fast.</p>
+<p>The cost for each R tuple is the cost of one index lookup on S (which we already know how to calculate from Section 3). The total cost is N_R times the per-lookup cost, plus the cost of scanning R.</p>
+<p>A useful way to think about the trade-off: <strong>hash join</strong> (discussed next) has a more predictable, moderate cost. <strong>Index nested loops</strong> can be much faster when R is small, but can also be much slower when R is large and the estimates are wrong. The query optimizer must weigh this risk when choosing between the two.</p>
+<hr>
+</section>
+</section>
+<section id="hash-join" class="level2">
+<h2 class="anchored" data-anchor-id="hash-join">7. Hash Join</h2>
+<p>The <strong>hash join</strong> is the workhorse join algorithm for modern database systems. It does not require any pre-existing index — instead, it builds one on the fly using a hash table. Hash join is the most commonly used join method in PostgreSQL and most other systems when the relations are large.</p>
+<section id="the-algorithm" class="level3">
+<h3 class="anchored" data-anchor-id="the-algorithm">The Algorithm</h3>
+<p>The idea is simple: assume S is the smaller relation. Read S into memory, build a hash table keyed on the join attribute, and then scan R and probe the hash table for matches.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-032.png" class="img-fluid figure-img"></p>
+<figcaption>Hash Join</figcaption>
+</figure>
+</div>
+<pre><code>read S into memory and build a hash table on S.a
+for each tuple r in R:
+    use the hash table to find all S tuples where S.a = r.a
+    for each matching s:
+        output (r, s)</code></pre>
+<p>In Python, you would literally use a dictionary. The keys are the values of attribute <code>a</code>, and the values are lists of S tuples with that value of <code>a</code>. For any given R tuple, looking up its <code>r.a</code> value in the dictionary immediately gives you all matching S tuples — no scanning, no tree traversal.</p>
+</section>
+<section id="iterator-model-implementation" class="level3">
+<h3 class="anchored" data-anchor-id="iterator-model-implementation">Iterator Model Implementation</h3>
+<p>In the iterator model, the implementation looks like this:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">open</span>(<span class="va">self</span>):</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.H <span class="op">=</span> build_hash_table(on<span class="op">=</span><span class="st">"S"</span>, key<span class="op">=</span><span class="st">"a"</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.rScan <span class="op">=</span> TableScan(<span class="st">"R"</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.rScan.<span class="bu">open</span>()</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.matches <span class="op">=</span> []</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.r <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">next</span>(<span class="va">self</span>):</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.matches <span class="kw">is</span> <span class="kw">not</span> empty:</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>            s <span class="op">=</span> <span class="va">self</span>.matches.pop()</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> join(<span class="va">self</span>.r, s)</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.r <span class="op">=</span> <span class="va">self</span>.rScan.<span class="bu">next</span>()</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.r <span class="kw">is</span> EOF:</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> EOF</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.matches <span class="op">=</span> <span class="va">self</span>.H.lookup(<span class="va">self</span>.r.a)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> close(<span class="va">self</span>):</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.rScan.close()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-033.png" class="img-fluid figure-img"></p>
+<figcaption>Hash Join Pseudocode</figcaption>
+</figure>
+</div>
+<p>A few important details:</p>
+<ul>
+<li>The hash table is built during <code>open()</code> (or, following PostgreSQL’s convention, during the first call to <code>next()</code> — PostgreSQL enforces the principle that data should not be touched in <code>open()</code>).</li>
+<li>For each R tuple, the hash table lookup returns <strong>all matching S tuples</strong>, but they are returned to the caller <strong>one at a time</strong> through successive <code>next()</code> calls. The <code>matches</code> list keeps track of which matches have already been returned.</li>
+<li>Once all matches for a given R tuple have been returned, the operator moves on to the next R tuple.</li>
+</ul>
+</section>
+<section id="cost-2" class="level3">
+<h3 class="anchored" data-anchor-id="cost-2">Cost</h3>
+<p>The cost of a hash join is remarkably good:</p>
+<ul>
+<li><strong>Disk blocks read</strong>: b_R + b_S — read each relation exactly once</li>
+<li><strong>CPU cost</strong>: O(N_R + N_S + O), where O is the number of output tuples</li>
+</ul>
+<p>This is dramatically better than nested loops join. Both relations are read just once from disk, and the hash table provides O(1) expected-time lookups. This is why hash join is the default choice for large relations in PostgreSQL.</p>
+</section>
+<section id="properties-and-limitations" class="level3">
+<h3 class="anchored" data-anchor-id="properties-and-limitations">Properties and Limitations</h3>
+<p><strong>Hash joins only work for equi-joins.</strong> You cannot build a hash table that efficiently answers <code>|R.a - S.a| &lt; 0.5</code> — there is no hash function that groups together values that are close but not equal. For non-equi-joins, you need nested loops or sort-merge join.</p>
+<p><strong>Hash joins require memory.</strong> The smaller relation (S) must fit in memory for the basic algorithm described here. If S is too large for memory, a more complex <strong>partitioned hash join</strong> is needed, which we will discuss when we cover external memory algorithms.</p>
+<p><strong>Historical context.</strong> The earliest database systems did not have hash joins, because memory was severely limited and building a hash table in memory was infeasible. They relied instead on <strong>sorting-based techniques</strong> (like sort-merge join) that require less memory. As memory grew larger and cheaper, hash joins became practical and are now the dominant join algorithm.</p>
+<p>In PostgreSQL, the hash table is implemented as a <strong>separate physical operator</strong> (called <code>Hash</code>) that is reused by various operators, including the hash join. The join itself is implemented in a separate <code>Hash Inner Join</code> operator. This separation allows the hash table construction logic to be shared and maintained in one place.</p>
+<hr>
+</section>
+</section>
+<section id="hash-based-outer-joins" class="level2">
+<h2 class="anchored" data-anchor-id="hash-based-outer-joins">8. Hash-Based Outer Joins</h2>
+<p>The hash join algorithm can be extended to handle <strong>outer joins</strong> with only minor modifications to the code. Since the modifications are small, most database systems (including PostgreSQL) handle inner joins and all outer join variants within the <strong>same operator code</strong>, controlled by a parameter that specifies which variant to execute.</p>
+<section id="left-outer-hash-join" class="level3">
+<h3 class="anchored" data-anchor-id="left-outer-hash-join">8.1 Left Outer Hash Join</h3>
+<p>Recall that in a <strong>left outer join</strong> (<code>R LEFT OUTER JOIN S</code>), every tuple in R must appear in the output. If an R tuple has no matching S tuple, it is returned padded with NULLs for the S attributes.</p>
+<p>The modification to the hash join code is minimal. After looking up matches for an R tuple, if the matches list is empty, we immediately return the R tuple combined with NULLs:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-043.png" class="img-fluid figure-img"></p>
+<figcaption>Left Outer Hash Join</figcaption>
+</figure>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># In the next() method, after computing matches:</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="va">self</span>.matches <span class="op">=</span> <span class="va">self</span>.H.lookup(<span class="va">self</span>.r.a)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">self</span>.matches <span class="kw">is</span> empty:</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> join(<span class="va">self</span>.r, NULLs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The rest of the code remains identical to the inner join version. Every tuple that would be returned by the inner join is still returned; the only addition is that non-matching R tuples are also returned (with NULLs).</p>
+</section>
+<section id="right-outer-hash-join" class="level3">
+<h3 class="anchored" data-anchor-id="right-outer-hash-join">8.2 Right Outer Hash Join</h3>
+<p>A <strong>right outer join</strong> (<code>R RIGHT OUTER JOIN S</code>) requires that every S tuple appear in the output. If an S tuple has no matching R tuple, it is returned padded with NULLs for the R attributes.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-042.png" class="img-fluid figure-img"></p>
+<figcaption>Outer Joins Overview</figcaption>
+</figure>
+</div>
+<p>This is harder than the left outer case. In the left outer join, we immediately know when an R tuple has no match (the lookup returns empty). But for S tuples, we cannot easily determine during the main loop which ones were never matched — the information is spread across all the R tuple lookups.</p>
+<p>The solution is to <strong>track which S tuples have been matched</strong>. We maintain a set <code>sNotMatched</code> initialized with all S tuples. Whenever an S tuple is returned as part of a match, we remove it from the set. After exhausting all R tuples, we enter a second phase and return the remaining unmatched S tuples padded with NULLs.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-044.png" class="img-fluid figure-img"></p>
+<figcaption>Right Outer Hash Join</figcaption>
+</figure>
+</div>
+<p>The implementation uses a <strong>phase variable</strong> to track which phase we are in:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">open</span>(<span class="va">self</span>):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.H <span class="op">=</span> build_hash_table(on<span class="op">=</span><span class="st">"S"</span>, key<span class="op">=</span><span class="st">"a"</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.rScan <span class="op">=</span> TableScan(<span class="st">"R"</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.rScan.<span class="bu">open</span>()</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.matches <span class="op">=</span> []</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.r <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.sNotMatched <span class="op">=</span> <span class="bu">set</span>(<span class="bu">all</span> S tuples)</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="va">self</span>.phase <span class="op">=</span> <span class="dv">1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">next</span>(<span class="va">self</span>):</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="va">self</span>.phase <span class="op">==</span> <span class="dv">1</span>:</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.matches <span class="kw">is</span> <span class="kw">not</span> empty:</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>                s <span class="op">=</span> <span class="va">self</span>.matches.pop()</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.sNotMatched.remove(s)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> join(<span class="va">self</span>.r, s)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.r <span class="op">=</span> <span class="va">self</span>.rScan.<span class="bu">next</span>()</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.r <span class="kw">is</span> EOF:</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.phase <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.matches <span class="op">=</span> <span class="va">self</span>.H.lookup(<span class="va">self</span>.r.a)</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="va">self</span>.phase <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.sNotMatched <span class="kw">is</span> <span class="kw">not</span> empty:</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>            s <span class="op">=</span> <span class="va">self</span>.sNotMatched.pop()</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> join(NULLs, s)</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> EOF</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-045.png" class="img-fluid figure-img"></p>
+<figcaption>Right Outer Hash Join (Phase 2)</figcaption>
+</figure>
+</div>
+<p>In <strong>Phase 1</strong>, the code operates like a normal inner join, but additionally removes each matched S tuple from the <code>sNotMatched</code> set. Once all R tuples have been processed (R is exhausted), the code transitions to <strong>Phase 2</strong>, where it returns all remaining unmatched S tuples one by one, each padded with NULLs for the R attributes.</p>
+<p>This approach is not the most memory-efficient — maintaining the <code>sNotMatched</code> set essentially doubles the memory usage. But it is conceptually clear and correct.</p>
+<p>You might wonder: why not just flip R and S and use a left outer join? The problem is that we assumed S is the smaller relation — the one we build the hash table on. If R is much larger, we do not want to build a hash table on R. So we need the ability to do a right outer join while still building the hash table on the smaller relation.</p>
+</section>
+<section id="full-outer-hash-join" class="level3">
+<h3 class="anchored" data-anchor-id="full-outer-hash-join">8.3 Full Outer Hash Join</h3>
+<p>A <strong>full outer join</strong> combines both left and right outer join behavior: non-matching R tuples are returned with NULLs, AND non-matching S tuples are returned with NULLs.</p>
+<p>The implementation simply combines both modifications:</p>
+<ul>
+<li>From the left outer join: if an R tuple has no matches, return it with NULLs</li>
+<li>From the right outer join: track unmatched S tuples and return them in Phase 2</li>
+</ul>
+<p>The same code handles all four join variants — <strong>inner</strong>, <strong>left outer</strong>, <strong>right outer</strong>, and <strong>full outer</strong> — controlled by if-conditions that activate or deactivate the relevant code paths based on a parameter. If the parameter specifies left outer or full outer, the “return with NULLs if no match” code is active. If it specifies right outer or full outer, the <code>sNotMatched</code> tracking and Phase 2 code is active. If neither is specified (inner join), both are deactivated.</p>
+<p>PostgreSQL’s <code>EXPLAIN</code> output does distinguish between these variants — it labels them as “Hash Inner Join”, “Hash Left Join”, “Hash Full Join”, and so on. Whether these are truly separate operators or just the same operator with different parameters is an implementation detail; the logic is essentially the same code with conditional branches.</p>
+<hr>
+</section>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">9. Summary</h2>
+<p>In this set of notes, we covered the implementation of two fundamental physical operators:</p>
+<p><strong>Selection</strong> has two main implementations:</p>
+<ul>
+<li><strong>Sequential scan</strong>: always applicable, cost = number of blocks in the relation. Simple and reliable, but expensive for large relations when you are looking for a small number of tuples.</li>
+<li><strong>Index scan</strong> (B+-tree or other index): much faster for selective queries — cost as low as a few block accesses. But requires an appropriate index to exist, and secondary indexes can be expensive for range queries due to random I/O.</li>
+</ul>
+<p><strong>Joins</strong> have three main implementations (with a fourth, sort-merge join, to be discussed next):</p>
+<ul>
+<li><strong>Nested loops join</strong>: always applicable (works for any join condition including non-equi-joins), but O(N_R × N_S) cost makes it impractical for all but the smallest relations.</li>
+<li><strong>Index nested loops join</strong>: uses an existing index on the inner relation. Very fast when the outer relation is small (e.g., due to a selective condition). Risk: performance degrades badly if the outer relation is larger than expected.</li>
+<li><strong>Hash join</strong>: the workhorse — reads each relation once, builds a hash table on the smaller one. Cost is O(b_R + b_S). Only works for equi-joins. Most commonly used join method in PostgreSQL and other modern systems.</li>
+</ul>
+<p><strong>Outer joins</strong> are implemented as straightforward extensions of hash join: left outer adds null-padding for non-matching outer tuples, right outer tracks and returns unmatched inner tuples in a second phase, and full outer combines both.</p>
+<p>In the next set of notes, we will cover <strong>sort-merge join</strong>, <strong>group by and aggregation</strong>, and what happens when the data is too large to fit in memory — the <strong>external memory</strong> algorithms.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

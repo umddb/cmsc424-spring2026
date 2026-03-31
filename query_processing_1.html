@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Query Processing — Query Plans, Pipelining, and Cost – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction-query-processing-overview" id="toc-introduction-query-processing-overview" class="nav-link active" data-scroll-target="#introduction-query-processing-overview">1. Introduction: Query Processing Overview</a></li>
+  <li><a href="#query-plans" id="toc-query-plans" class="nav-link" data-scroll-target="#query-plans">2. Query Plans</a>
+  <ul class="collapse">
+  <li><a href="#a-simple-example" id="toc-a-simple-example" class="nav-link" data-scroll-target="#a-simple-example">A Simple Example</a></li>
+  <li><a href="#a-join-example" id="toc-a-join-example" class="nav-link" data-scroll-target="#a-join-example">A Join Example</a></li>
+  <li><a href="#equivalent-plans-and-the-need-for-optimization" id="toc-equivalent-plans-and-the-need-for-optimization" class="nav-link" data-scroll-target="#equivalent-plans-and-the-need-for-optimization">Equivalent Plans and the Need for Optimization</a></li>
+  <li><a href="#plans-in-pipeline-style-systems" id="toc-plans-in-pipeline-style-systems" class="nav-link" data-scroll-target="#plans-in-pipeline-style-systems">Plans in Pipeline-Style Systems</a></li>
+  </ul></li>
+  <li><a href="#physical-vs-logical-operators" id="toc-physical-vs-logical-operators" class="nav-link" data-scroll-target="#physical-vs-logical-operators">3. Physical vs Logical Operators</a></li>
+  <li><a href="#materialization-vs-pipelining" id="toc-materialization-vs-pipelining" class="nav-link" data-scroll-target="#materialization-vs-pipelining">4. Materialization vs Pipelining</a>
+  <ul class="collapse">
+  <li><a href="#materialization" id="toc-materialization" class="nav-link" data-scroll-target="#materialization">Materialization</a></li>
+  <li><a href="#pipelining" id="toc-pipelining" class="nav-link" data-scroll-target="#pipelining">Pipelining</a></li>
+  </ul></li>
+  <li><a href="#the-iterator-model" id="toc-the-iterator-model" class="nav-link" data-scroll-target="#the-iterator-model">5. The Iterator Model</a>
+  <ul class="collapse">
+  <li><a href="#the-three-functions" id="toc-the-three-functions" class="nav-link" data-scroll-target="#the-three-functions">The Three Functions</a></li>
+  <li><a href="#how-it-works-the-select-operator" id="toc-how-it-works-the-select-operator" class="nav-link" data-scroll-target="#how-it-works-the-select-operator">How It Works: The Select Operator</a></li>
+  <li><a href="#demand-driven-execution" id="toc-demand-driven-execution" class="nav-link" data-scroll-target="#demand-driven-execution">Demand-Driven Execution</a></li>
+  <li><a href="#producer-driven-pipelining" id="toc-producer-driven-pipelining" class="nav-link" data-scroll-target="#producer-driven-pipelining">Producer-Driven Pipelining</a></li>
+  </ul></li>
+  <li><a href="#cost-of-query-processing" id="toc-cost-of-query-processing" class="nav-link" data-scroll-target="#cost-of-query-processing">6. Cost of Query Processing</a>
+  <ul class="collapse">
+  <li><a href="#what-to-measure" id="toc-what-to-measure" class="nav-link" data-scroll-target="#what-to-measure">What to Measure</a></li>
+  <li><a href="#our-simplification" id="toc-our-simplification" class="nav-link" data-scroll-target="#our-simplification">Our Simplification</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Query Processing — Query Plans, Pipelining, and Cost</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction-query-processing-overview" class="level2">
+<h2 class="anchored" data-anchor-id="introduction-query-processing-overview">1. Introduction: Query Processing Overview</h2>
+<p>In the previous module, we examined how data is physically stored — the storage hierarchy, file organization, tuple layouts, and index structures. We now turn to the next major topic: <strong>query processing</strong>. Given that data is stored on disk in blocks, how does a database system actually execute a SQL query? How does it decide which blocks to read, in what order, and how to combine the results?</p>
+<p>The answer involves a sophisticated pipeline of components. When a user submits a SQL query, the database system processes it through several stages:</p>
+<ol type="1">
+<li><strong>Query Parser</strong>: resolves references, checks for syntax errors, and converts the SQL text into an internal representation (similar to relational algebra).</li>
+<li><strong>Query Optimizer</strong>: examines the internal representation and determines the <em>best</em> way to execute the query — which indexes to use, which join method to employ, in what order to process the relations.</li>
+<li><strong>Query Processor</strong>: reads data from the files, executes the chosen plan using the selected physical operators (joins, selections, aggregates), and produces the final result.</li>
+</ol>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-005.png" class="img-fluid figure-img"></p>
+<figcaption>Query Processing Pipeline</figcaption>
+</figure>
+</div>
+<p>The optimizer relies on <strong>statistics</strong> about the data — such as the number of tuples in each relation, the distribution of values, and the available indexes — to make its decisions. The query processor interacts with the <strong>buffer manager</strong>, which is responsible for moving blocks between disk and memory, and through the buffer manager with the underlying <strong>storage layer</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-004.png" class="img-fluid figure-img"></p>
+<figcaption>Query Processing and Storage Layers</figcaption>
+</figure>
+</div>
+<p>Throughout this module, we will use <strong>PostgreSQL</strong> as a running example. PostgreSQL is written in C but has a well-structured codebase that is relatively easy to follow. Its <code>EXPLAIN</code> command allows us to inspect the query plans it generates, making it an excellent tool for understanding how query processing works in practice.</p>
+<p>The topics we will cover include:</p>
+<ul>
+<li><strong>Query plans</strong>: what they are, how to read them</li>
+<li><strong>Pipelining vs materialization</strong>: how operators pass tuples to each other</li>
+<li><strong>Operator implementations</strong>: how selections, joins, and aggregates are actually executed</li>
+<li><strong>External memory algorithms</strong>: what happens when data exceeds available memory</li>
+<li><strong>Query optimization</strong>: how the system finds the best plan for a given query</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-002.png" class="img-fluid figure-img"></p>
+<figcaption>Module Roadmap</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="query-plans" class="level2">
+<h2 class="anchored" data-anchor-id="query-plans">2. Query Plans</h2>
+<p>A <strong>query plan</strong> is a tree of operators that specifies exactly how a query will be executed. The base relations appear at the leaves (bottom) of the tree, intermediate operations occupy the internal nodes, and the final result emerges at the root (top).</p>
+<section id="a-simple-example" class="level3">
+<h3 class="anchored" data-anchor-id="a-simple-example">A Simple Example</h3>
+<p>Consider the query:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> salary</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> instructor</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> salary <span class="op">&lt;</span> <span class="dv">75000</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The query plan for this might look like a chain of three operators: a <strong>scan</strong> operator that reads the <code>instructor</code> relation from disk, a <strong>selection</strong> operator that filters tuples where <code>salary &lt; 75000</code>, and a <strong>projection</strong> operator that extracts only the <code>salary</code> attribute.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-007.png" class="img-fluid figure-img"></p>
+<figcaption>Simple Query Plan</figcaption>
+</figure>
+</div>
+<p>On the left side of the figure, the plan is expressed using relational algebra notation (π, σ). On the right, it is drawn as a tree of named operators — scan, selection, and project — with annotations indicating the specific parameters (the predicate for selection, the attribute list for projection).</p>
+</section>
+<section id="a-join-example" class="level3">
+<h3 class="anchored" data-anchor-id="a-join-example">A Join Example</h3>
+<p>For a more complex query involving a join:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> name</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> department <span class="kw">NATURAL</span> <span class="kw">JOIN</span> instructor</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> building <span class="op">=</span> <span class="st">'Watson'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The logical plan shows a selection on <code>department</code>, a join with <code>instructor</code>, and a projection on <code>name</code>. But the <strong>physical plan</strong> that PostgreSQL actually generates looks quite different: it uses a <code>Hash</code> operator to build a hash table on <code>department</code>, followed by a <code>Hash Inner Join</code> operator that probes the hash table using <code>instructor</code> tuples. There is no explicit selection or projection operator — the selection is folded into the scan, and the projection happens implicitly.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-008.png" class="img-fluid figure-img"></p>
+<figcaption>Logical vs Physical Query Plan</figcaption>
+</figure>
+</div>
+<p>This illustrates an important point: the query plan that PostgreSQL outputs is a list of <strong>physical operators</strong>, which are the actual implementations the system will use. Being able to read these plans is an important skill — for simple queries, you should be able to understand what the system is doing by inspecting the <code>EXPLAIN</code> output.</p>
+</section>
+<section id="equivalent-plans-and-the-need-for-optimization" class="level3">
+<h3 class="anchored" data-anchor-id="equivalent-plans-and-the-need-for-optimization">Equivalent Plans and the Need for Optimization</h3>
+<p>The same query can often be evaluated in multiple ways. For example, consider a query joining three relations with a selection condition. The selection can be applied before or after the join, and the join order itself can vary. These are <strong>equivalent plans</strong> — they produce the same result but may have vastly different performance characteristics.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-010.png" class="img-fluid figure-img"></p>
+<figcaption>Equivalent Expression Trees</figcaption>
+</figure>
+</div>
+<p>The existence of multiple equivalent plans is what motivates <strong>query optimization</strong>: the system must search through the space of possible plans and choose the one with the lowest estimated cost. We will discuss optimization in detail later in this module.</p>
+</section>
+<section id="plans-in-pipeline-style-systems" class="level3">
+<h3 class="anchored" data-anchor-id="plans-in-pipeline-style-systems">Plans in Pipeline-Style Systems</h3>
+<p>In systems like Apache Spark or MongoDB, query plans look slightly different. Because these systems use pipeline-style query languages (chains of <code>filter</code>, <code>map</code>, <code>flatMap</code>, <code>reduceByKey</code> operations), the query plan maps naturally to a linear chain of operators rather than a tree.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-011.png" class="img-fluid figure-img"></p>
+<figcaption>Spark/MongoDB Plans</figcaption>
+</figure>
+</div>
+<p>An important distinction is that in pipeline-style systems, there is less scope for rearranging operators across the pipeline, because the user-defined functions (lambdas) are treated as black boxes. Each operator itself still needs to be optimized, but the system has fewer opportunities for global plan restructuring compared to SQL-based systems.</p>
+<hr>
+</section>
+</section>
+<section id="physical-vs-logical-operators" class="level2">
+<h2 class="anchored" data-anchor-id="physical-vs-logical-operators">3. Physical vs Logical Operators</h2>
+<p>A key concept in query processing is the distinction between <strong>logical operators</strong> and <strong>physical operators</strong>.</p>
+<p><strong>Logical operators</strong> correspond to the abstractions of the query language: Select (σ), Project (π), Natural Join (⋈), Outer Join, Aggregate, and so on. They describe <em>what</em> computation needs to happen.</p>
+<p><strong>Physical operators</strong> are the actual implementations in the database system’s code. They describe <em>how</em> the computation is carried out. Examples include sequential scan, index scan, hash join, sort-merge join, and hash aggregate.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-009.png" class="img-fluid figure-img"></p>
+<figcaption>Physical vs Logical Operators</figcaption>
+</figure>
+</div>
+<p>The mapping between logical and physical operators is <strong>not one-to-one</strong>, for several reasons:</p>
+<ul>
+<li><p><strong>Some logical operators are too simple for a dedicated physical operator.</strong> Filter (selection) and project are straightforward enough that they are often folded into other operators — for example, a scan operator might apply a filter as it reads tuples, rather than passing them to a separate filter operator.</p></li>
+<li><p><strong>Different join variants share the same physical implementation.</strong> Inner join, left outer join, right outer join, full outer join, and semi-join can all be handled by the same hash join code with minor modifications. Having a separate physical operator for each would create unnecessary code duplication.</p></li>
+<li><p><strong>Some physical operators serve multiple logical purposes.</strong> Sorting is used for sort-merge join, for <code>ORDER BY</code>, for duplicate elimination (<code>DISTINCT</code>), and for <code>GROUP BY</code>. Rather than reimplementing sorting in each of these contexts, the database system has a single sort operator that is reused by all of them.</p></li>
+</ul>
+<p>When you examine PostgreSQL’s <code>EXPLAIN</code> output, you are seeing physical operators. Understanding what each one does — and how it relates to the logical query — is essential for diagnosing performance issues.</p>
+<hr>
+</section>
+<section id="materialization-vs-pipelining" class="level2">
+<h2 class="anchored" data-anchor-id="materialization-vs-pipelining">4. Materialization vs Pipelining</h2>
+<p>Once we have a query plan — a tree of operators — we need to decide how tuples flow between operators. There are two fundamental approaches: <strong>materialization</strong> and <strong>pipelining</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-013.png" class="img-fluid figure-img"></p>
+<figcaption>Materialization vs Pipelining</figcaption>
+</figure>
+</div>
+<section id="materialization" class="level3">
+<h3 class="anchored" data-anchor-id="materialization">Materialization</h3>
+<p>In <strong>materialized evaluation</strong>, each operator runs to completion and writes its entire output to a temporary file on disk. The next operator in the plan then reads from that file. This process repeats from the bottom of the plan tree to the top.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-014.png" class="img-fluid figure-img"></p>
+<figcaption>Materialization</figcaption>
+</figure>
+</div>
+<p>For example, a materialized join operator would open both input relations (which are files on disk), iterate through all tuple pairs looking for matches, write every matching pair to an output file, and close everything. The next operator in the plan would then open this output file and process it.</p>
+<pre><code>open R
+open Out for writing
+
+for each tuple r in R:
+    open S
+    for each tuple s in S:
+        if join_match(r, s):
+            write joined_tuple(r, s) to Out
+    close S
+
+close R
+close Out</code></pre>
+<p>Materialization has several advantages: it is <strong>always applicable</strong> (it works regardless of what the operators do), it has <strong>low memory requirements</strong> (only one operator’s data needs to be in memory at a time), and it is <strong>naturally fault-tolerant</strong> (intermediate results are on disk, so they survive crashes). For these reasons, materialization is often the first approach implemented when building a new database system.</p>
+<p>The major disadvantage is <strong>cost</strong>: writing intermediate results to disk and reading them back can be extremely expensive, especially for multi-operator plans where every intermediate result is written and re-read.</p>
+</section>
+<section id="pipelining" class="level3">
+<h3 class="anchored" data-anchor-id="pipelining">Pipelining</h3>
+<p>In <strong>pipelined evaluation</strong>, multiple operators run simultaneously. Instead of writing intermediate results to disk, tuples flow directly from one operator to the next — as soon as one operator produces a tuple, it is immediately consumed by the next operator in the plan.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-015.png" class="img-fluid figure-img"></p>
+<figcaption>Pipelining</figcaption>
+</figure>
+</div>
+<p>Pipelining is cheaper than materialization because it avoids the cost of writing and reading temporary relations. However, it requires <strong>more memory</strong> (all operators in the pipeline are active at the same time and each maintains its own state) and has <strong>limited applicability</strong>: some operators are <strong>blocking</strong>, meaning they must consume their entire input before they can produce any output. Sorting is the classic example of a blocking operator — you cannot output the first sorted tuple until you have seen all the input tuples. Aggregation (<code>GROUP BY</code>) is another example.</p>
+<p>When a blocking operator appears in a query plan, it acts as a pipeline breaker — the pipeline before it must complete before the pipeline after it can begin.</p>
+<hr>
+</section>
+</section>
+<section id="the-iterator-model" class="level2">
+<h2 class="anchored" data-anchor-id="the-iterator-model">5. The Iterator Model</h2>
+<p>The <strong>iterator model</strong> (also called the Volcano model or demand-driven pipelining) is the standard way that database systems implement pipelined execution. It is used by PostgreSQL and many other systems. Despite its association with pipelining, the iterator model is really a <strong>software engineering pattern</strong> — a way to make operators composable — and it works for both pipelined and materialized evaluation.</p>
+<section id="the-three-functions" class="level3">
+<h3 class="anchored" data-anchor-id="the-three-functions">The Three Functions</h3>
+<p>In the iterator model, every physical operator implements exactly three functions:</p>
+<ul>
+<li><p><strong><code>Open()</code></strong>: Initialize the operator’s internal state. This includes creating any necessary data structures and propagating the <code>Open()</code> call down to all child operators. Importantly, <code>Open()</code> should not process any data — it only sets things up.</p></li>
+<li><p><strong><code>Next()</code></strong>: Return the next output tuple. This is where all the actual work happens. When a parent operator calls <code>Next()</code> on a child, the child may in turn call <code>Next()</code> on <em>its</em> children, and so on, all the way down to the base relations. Each call to <code>Next()</code> returns exactly one tuple, or a special end-of-file marker if there are no more tuples to return.</p></li>
+<li><p><strong><code>Close()</code></strong>: Tear down the operator’s state, release resources, and propagate the <code>Close()</code> call to children.</p></li>
+</ul>
+</section>
+<section id="how-it-works-the-select-operator" class="level3">
+<h3 class="anchored" data-anchor-id="how-it-works-the-select-operator">How It Works: The Select Operator</h3>
+<p>Consider a simple selection operator. Its implementation in the iterator model looks like this:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">open</span>(<span class="va">self</span>):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    Input.<span class="bu">open</span>()</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">next</span>(<span class="va">self</span>):</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> Input.<span class="bu">next</span>()</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> t <span class="kw">is</span> EOF:</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> EOF</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> predicate(t):</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> t</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> close(<span class="va">self</span>):</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    Input.close()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The <code>Open()</code> call propagates down to the input operator (which might be a scan of a base relation). The <code>Next()</code> call repeatedly asks the input for tuples, checks each one against the predicate, and returns the first one that passes. If the input is exhausted, it returns EOF. The <code>Close()</code> call propagates down to close the input.</p>
+</section>
+<section id="demand-driven-execution" class="level3">
+<h3 class="anchored" data-anchor-id="demand-driven-execution">Demand-Driven Execution</h3>
+<p>Execution in the iterator model is <strong>demand-driven</strong>: it is initiated from the top of the plan tree. When the user requests results, the topmost operator calls <code>Next()</code> on its child, which calls <code>Next()</code> on <em>its</em> children, and so on. Tuples flow back up the tree as each <code>Next()</code> call returns.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-017.png" class="img-fluid figure-img"></p>
+<figcaption>Open() propagation</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-018.png" class="img-fluid figure-img"></p>
+<figcaption>Next() calls flowing through the tree</figcaption>
+</figure>
+</div>
+<p>The <code>Open()</code> calls propagate from top to bottom during initialization. Then, during execution, <code>Next()</code> calls propagate downward (requesting tuples) and tuples flow back upward (returning results). This continues until the topmost operator returns EOF.</p>
+<p>PostgreSQL follows a principle that data should not be touched during <code>Open()</code> or <code>Close()</code> — all data processing happens exclusively in <code>Next()</code> calls. This means that even operations like building a hash table (which might seem like initialization) happen during the first call to <code>Next()</code>, not during <code>Open()</code>. PostgreSQL also has an efficient approach to memory management: it allocates a single large memory context for an entire query plan, and when the query completes, it deallocates the entire context at once rather than individually freeing each data structure.</p>
+</section>
+<section id="producer-driven-pipelining" class="level3">
+<h3 class="anchored" data-anchor-id="producer-driven-pipelining">Producer-Driven Pipelining</h3>
+<p>An alternative to the demand-driven iterator model is <strong>producer-driven pipelining</strong>, where operators actively push tuples into output queues rather than waiting to be asked for them. Each operator has a <code>run()</code> method that reads from input queues and writes to output queues.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-019.png" class="img-fluid figure-img"></p>
+<figcaption>Producer-Driven Pipelining</figcaption>
+</figure>
+</div>
+<p>Producer-driven pipelining is particularly well-suited to <strong>parallel and distributed systems</strong>, because the queues can span machines — one operator running on machine A can write to a queue that is read by an operator on machine B. This is essentially how systems like Apache Spark work. The downside is that you need to be careful about handling overfull queues (backpressure).</p>
+<p>Most traditional single-machine database systems (including PostgreSQL) use the demand-driven iterator model, while distributed systems tend to use producer-driven approaches.</p>
+<hr>
+</section>
+</section>
+<section id="cost-of-query-processing" class="level2">
+<h2 class="anchored" data-anchor-id="cost-of-query-processing">6. Cost of Query Processing</h2>
+<p>In order to choose the best query plan from among many alternatives, the database system needs a way to <strong>estimate the cost</strong> of each plan. This cost estimation is crucial for query optimization.</p>
+<section id="what-to-measure" class="level3">
+<h3 class="anchored" data-anchor-id="what-to-measure">What to Measure</h3>
+<p>The challenge is that “cost” in a modern computing environment is multidimensional. There are many competing factors:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-020.png" class="img-fluid figure-img"></p>
+<figcaption>Cost Factors</figcaption>
+</figure>
+</div>
+<ul>
+<li><strong>CPU instructions</strong>: how much computation is required</li>
+<li><strong>Disk I/Os</strong>: how many blocks must be read from or written to disk, and whether those accesses are random or sequential</li>
+<li><strong>Network usage</strong>: relevant in distributed settings</li>
+<li><strong>Memory usage</strong>: how much RAM the plan requires</li>
+<li><strong>Cache misses</strong>: relevant for in-memory databases where disk I/O is not the bottleneck</li>
+</ul>
+<p>The key insight is that you should <strong>optimize for the actual bottleneck</strong>. If you have a terabyte of memory and a single disk, there is no point in optimizing for memory usage — disk I/O is your bottleneck. If you are running an in-memory database, disk I/O is irrelevant but cache misses become critical. If you are in a distributed data center with a fast network, network cost may not matter, but CPU and disk will.</p>
+<p>In practice, most database systems use a <strong>weighted combination</strong> of these factors. A typical approach might be something like:</p>
+<p><span class="math display">\[\text{cost} = w_1 \times \text{CPU instructions} + w_2 \times \text{disk I/Os}\]</span></p>
+<p>where the weights are tuned to the specific hardware environment. PostgreSQL’s <code>EXPLAIN</code> output shows both estimated and actual costs, reflecting this kind of combined metric.</p>
+</section>
+<section id="our-simplification" class="level3">
+<h3 class="anchored" data-anchor-id="our-simplification">Our Simplification</h3>
+<p>For this course, we will focus primarily on counting <strong>the number of disk blocks read</strong> as our cost metric, supplemented by CPU cost expressed as O(relation size) where appropriate. This is a simplification — in particular, it does not distinguish between random and sequential I/O, which can differ by a factor of 1000 on hard disks (though the gap is much smaller on SSDs).</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-021.png" class="img-fluid figure-img"></p>
+<figcaption>Cost Simplification</figcaption>
+</figure>
+</div>
+<p>The textbook uses a more detailed cost function that separates random and sequential I/Os, reflecting the traditional focus on hard disk performance. We will generally use the simpler model, but it is important to understand that real systems must account for these distinctions.</p>
+<p>One important point: cost estimates only need to be <strong>relatively correct</strong> — they must correctly rank alternative plans, but they do not need to predict the exact execution time. As long as the plan that is estimated to be cheapest is actually the fastest (or close to it), the optimization has done its job. This is why approximations are acceptable in cost estimation.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

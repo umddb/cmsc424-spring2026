@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>LectureNotes – CMSC424 Lecture Notes</title>
+<title>Lecture Notes for CMSC 424, Section 201, Spring 2026 – CMSC424 Lecture Notes</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -113,6 +113,14 @@ ul.task-list li input[type="checkbox"] {
     <a class="dropdown-item" href="./storage_3.html">
  <span class="dropdown-text">Indexes</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item">
@@ -130,15 +138,22 @@ ul.task-list li input[type="checkbox"] {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#storage-and-indexes" id="toc-storage-and-indexes" class="nav-link active" data-scroll-target="#storage-and-indexes">Storage and Indexes</a></li>
+  <li><a href="#query-processing-and-optimization" id="toc-query-processing-and-optimization" class="nav-link" data-scroll-target="#query-processing-and-optimization">Query Processing and Optimization</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">LectureNotes</h1>
+<h1 class="title">Lecture Notes for CMSC 424, Section 201, Spring 2026</h1>
 </div>
 
 
@@ -155,10 +170,25 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>This is a Quarto website.</p>
-<p>To learn more about Quarto websites visit <a href="https://quarto.org/docs/websites" class="uri">https://quarto.org/docs/websites</a>.</p>
+<p>This contains a partial set of lecture notes, that were created automatically using the slides and audio transcripts, using AI tools (mostly Claude Code).</p>
+<p>NOTE: I have not had a chance to carefully review the notes, which means there might errors or hallucinations. Also, the notes are not guaranteed to be complete and might be missing things that were covered in class.</p>
+<section id="storage-and-indexes" class="level3">
+<h3 class="anchored" data-anchor-id="storage-and-indexes">Storage and Indexes</h3>
+<ul>
+<li><a href="./storage_1.html">Computing and Storage Hardware</a> — The storage hierarchy, access time orders of magnitude, CPUs and caches, hard disks, SSDs, and how hardware characteristics shape database system design.</li>
+<li><a href="./storage_2.html">File Organization</a> — How tuples are laid out within blocks (fixed-length records, slotted pages, PAX) and across blocks (heap, sequential, hashing), plus column-oriented storage and columnar file formats like Parquet.</li>
+<li><a href="./storage_3.html">Indexes</a> — B+-trees (structure, searching, insertion, deletion), log-structured merge trees, hash indexes, bitmap indexes, composite search keys, and R-trees.</li>
+</ul>
+</section>
+<section id="query-processing-and-optimization" class="level3">
+<h3 class="anchored" data-anchor-id="query-processing-and-optimization">Query Processing and Optimization</h3>
+<ul>
+<li><a href="./query_processing_1.html">Query Plans, Pipelining, and Cost</a> — What a query plan is, logical vs physical operators, materialization vs pipelining, the iterator model (open/next/close), and how query cost is estimated.</li>
+<li><a href="./query_processing_2.html">Selection and Join Implementations</a> — Sequential scan and index-based selection, nested loops join, index nested loops join, hash join, and hash-based outer joins (left, right, full).</li>
+</ul>
 
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
