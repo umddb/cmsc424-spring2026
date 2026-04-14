@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Query Processing — Parallel Execution of Relational Operators – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">1. Introduction</a></li>
+  <li><a href="#parallel-sort" id="toc-parallel-sort" class="nav-link" data-scroll-target="#parallel-sort">2. Parallel Sort</a>
+  <ul class="collapse">
+  <li><a href="#the-algorithm" id="toc-the-algorithm" class="nav-link" data-scroll-target="#the-algorithm">2.1 The Algorithm</a></li>
+  <li><a href="#worked-example" id="toc-worked-example" class="nav-link" data-scroll-target="#worked-example">2.2 Worked Example</a></li>
+  <li><a href="#the-shuffle-is-the-expensive-step" id="toc-the-shuffle-is-the-expensive-step" class="nav-link" data-scroll-target="#the-shuffle-is-the-expensive-step">2.3 The Shuffle Is the Expensive Step</a></li>
+  <li><a href="#the-skew-problem-and-its-remedy" id="toc-the-skew-problem-and-its-remedy" class="nav-link" data-scroll-target="#the-skew-problem-and-its-remedy">2.4 The Skew Problem and Its Remedy</a></li>
+  </ul></li>
+  <li><a href="#parallel-join" id="toc-parallel-join" class="nav-link" data-scroll-target="#parallel-join">3. Parallel Join</a>
+  <ul class="collapse">
+  <li><a href="#standard-parallel-hash-join" id="toc-standard-parallel-hash-join" class="nav-link" data-scroll-target="#standard-parallel-hash-join">3.1 Standard Parallel Hash Join</a></li>
+  <li><a href="#worked-example-1" id="toc-worked-example-1" class="nav-link" data-scroll-target="#worked-example-1">3.2 Worked Example</a></li>
+  <li><a href="#fragment-and-replicate-for-asymmetric-relations" id="toc-fragment-and-replicate-for-asymmetric-relations" class="nav-link" data-scroll-target="#fragment-and-replicate-for-asymmetric-relations">3.3 Fragment-and-Replicate for Asymmetric Relations</a></li>
+  </ul></li>
+  <li><a href="#parallel-aggregation" id="toc-parallel-aggregation" class="nav-link" data-scroll-target="#parallel-aggregation">4. Parallel Aggregation</a>
+  <ul class="collapse">
+  <li><a href="#case-1-small-number-of-groups" id="toc-case-1-small-number-of-groups" class="nav-link" data-scroll-target="#case-1-small-number-of-groups">4.1 Case 1: Small Number of Groups</a></li>
+  <li><a href="#case-2-large-number-of-groups-decomposable-aggregate" id="toc-case-2-large-number-of-groups-decomposable-aggregate" class="nav-link" data-scroll-target="#case-2-large-number-of-groups-decomposable-aggregate">4.2 Case 2: Large Number of Groups, Decomposable Aggregate</a></li>
+  <li><a href="#case-3-non-decomposable-aggregates-or-pure-grouping" id="toc-case-3-non-decomposable-aggregates-or-pure-grouping" class="nav-link" data-scroll-target="#case-3-non-decomposable-aggregates-or-pure-grouping">4.3 Case 3: Non-Decomposable Aggregates (or Pure Grouping)</a></li>
+  </ul></li>
+  <li><a href="#other-operations" id="toc-other-operations" class="nav-link" data-scroll-target="#other-operations">5. Other Operations</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">6. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Query Processing — Parallel Execution of Relational Operators</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">1. Introduction</h2>
+<p>The previous set of notes established the architectural setting: a shared-nothing cluster where each machine owns its slice of the data, and machines communicate only through explicit network transfers. The question now is: given that a relation <span class="math inline">\(R\)</span> is partitioned as <span class="math inline">\(R_1, R_2, \ldots, R_k\)</span> across <span class="math inline">\(k\)</span> machines, how do we execute the standard relational operators — sort, join, aggregation — in this environment?</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-115.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Operator Execution: Setup</figcaption>
+</figure>
+</div>
+<p>The fundamental challenge is that two tuples which need to interact — because they match on a join attribute, or belong to the same group — may be on different machines. No operator can compare tuples it cannot see. The universal solution is <strong>redistribution</strong>: before (or during) an operation, move tuples across the network so that tuples that must interact end up on the same machine. This redistribution step is called a <strong>shuffle</strong> in the parallel computing literature, and it is the central primitive that underlies every parallel operator.</p>
+<p>The setup used throughout is as follows. We have <span class="math inline">\(k\)</span> machines in a shared-nothing cluster. Machine <span class="math inline">\(i\)</span> holds partition <span class="math inline">\(R_i\)</span> of relation <span class="math inline">\(R\)</span> on its local disk and can read it directly without any network transfer. Reading <span class="math inline">\(R_j\)</span> for <span class="math inline">\(j \neq i\)</span> requires a message to machine <span class="math inline">\(j\)</span> and a network transfer of the data back. All of the algorithms we discuss work in this model.</p>
+<p>This maps directly to Apache Spark. In Spark, the redistribution of data between stages is explicitly called a <strong>shuffle</strong>, and it is by far the most expensive step in any Spark job — a point Spark’s documentation and performance tuning guides emphasize repeatedly. The algorithms for sort, join, and aggregation described here are exactly what Spark implements under the hood; the only difference is that Spark adds fault tolerance by writing shuffle data to disk so that lost partitions can be recomputed from lineage rather than restarting the entire job.</p>
+<hr>
+</section>
+<section id="parallel-sort" class="level2">
+<h2 class="anchored" data-anchor-id="parallel-sort">2. Parallel Sort</h2>
+<section id="the-algorithm" class="level3">
+<h3 class="anchored" data-anchor-id="the-algorithm">2.1 The Algorithm</h3>
+<p>The goal is to sort the full relation <span class="math inline">\(R\)</span> on attribute <span class="math inline">\(A\)</span>, producing a globally sorted result. The challenge: <span class="math inline">\(R\)</span>’s tuples are spread arbitrarily across <span class="math inline">\(k\)</span> machines, with no relationship between the values of <span class="math inline">\(A\)</span> in <span class="math inline">\(R_1\)</span>, <span class="math inline">\(R_2\)</span>, and <span class="math inline">\(R_3\)</span>. A small value of <span class="math inline">\(A\)</span> might be in <span class="math inline">\(R_3\)</span> while a large value is in <span class="math inline">\(R_1\)</span>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-116.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Sort — Phase 1: Local Sorted Runs</figcaption>
+</figure>
+</div>
+<p><strong>Phase 1 — Local sort.</strong> Each machine sorts its local partition <span class="math inline">\(R_i\)</span> on attribute <span class="math inline">\(A\)</span> independently. After this phase, machine <span class="math inline">\(i\)</span> holds a sorted run of <span class="math inline">\(R_i\)</span>. These sorted runs are not globally ordered — the largest <span class="math inline">\(A\)</span> value in <span class="math inline">\(R_1\)</span> may be smaller or larger than any value in <span class="math inline">\(R_2\)</span>.</p>
+<p><strong>Phase 2 — Range-partition shuffle.</strong> Choose <span class="math inline">\(k - 1\)</span> split points that divide the domain of <span class="math inline">\(A\)</span> into <span class="math inline">\(k\)</span> disjoint ranges, one per machine: <span class="math inline">\((-\infty, s_1)\)</span>, <span class="math inline">\([s_1, s_2)\)</span>, <span class="math inline">\(\ldots\)</span>, <span class="math inline">\([s_{k-1}, +\infty)\)</span>. Each machine then scans its local sorted run and routes each tuple to the machine responsible for the range containing its <span class="math inline">\(A\)</span> value. A tuple with <span class="math inline">\(A &lt; s_1\)</span> goes to machine 1; a tuple with <span class="math inline">\(s_1 \le A &lt; s_2\)</span> goes to machine 2; and so on.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-117.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Sort — Phase 2: Range-Partition Shuffle</figcaption>
+</figure>
+</div>
+<p>After the shuffle, machine <span class="math inline">\(i\)</span> holds all tuples from the entire relation <span class="math inline">\(R\)</span> whose <span class="math inline">\(A\)</span> value falls in range <span class="math inline">\(i\)</span> — including tuples that originated on other machines. The key property: range <span class="math inline">\(i\)</span>’s maximum value is strictly less than range <span class="math inline">\((i+1)\)</span>’s minimum value. Therefore, once each machine sorts its received data, the result is globally sorted: concatenating machine 1’s output, then machine 2’s, then machine 3’s yields the complete sorted relation.</p>
+<p><strong>Phase 3 — Local sort of received data.</strong> Each machine sorts the tuples it received from all machines. Since the inbound data is already broken into sorted runs from Phase 1, this final sort can use an efficient merge rather than a full comparison sort.</p>
+<p>Note: Phase 1 is not strictly required — the shuffle can be applied to unsorted data, and Phase 3 sorts everything from scratch. The initial sort makes the shuffle slightly cheaper (sorted runs can be streamed and merged efficiently) but does not change the correctness or the asymptotic communication cost.</p>
+</section>
+<section id="worked-example" class="level3">
+<h3 class="anchored" data-anchor-id="worked-example">2.2 Worked Example</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-118.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Sort — Worked Example</figcaption>
+</figure>
+</div>
+<p>Consider 12 tuples distributed three per machine, with split points chosen so that <span class="math inline">\(A &lt; 100\)</span> goes to machine 1, <span class="math inline">\(100 \le A &lt; 300\)</span> goes to machine 2, and <span class="math inline">\(A \ge 300\)</span> goes to machine 3. After the shuffle, each machine holds its range’s tuples drawn from all three original partitions. Each machine then sorts its received tuples locally. The globally sorted order is obtained by reading machine 1’s output, then machine 2’s, then machine 3’s.</p>
+</section>
+<section id="the-shuffle-is-the-expensive-step" class="level3">
+<h3 class="anchored" data-anchor-id="the-shuffle-is-the-expensive-step">2.3 The Shuffle Is the Expensive Step</h3>
+<p>The data movement in Phase 2 is substantial. In the worst case, almost every tuple moves from its origin machine to a different destination machine. For a 100 GB relation across 10 machines, each holding 10 GB, Phase 2 may transfer close to 90 GB of data over the network — 9 GB leaving each machine to be distributed among the others. This is why parallel sort, and any operation that requires a shuffle, is significantly more expensive than its single-machine counterpart, and why minimizing the number of shuffles in a query plan is a primary optimization goal in systems like Spark.</p>
+</section>
+<section id="the-skew-problem-and-its-remedy" class="level3">
+<h3 class="anchored" data-anchor-id="the-skew-problem-and-its-remedy">2.4 The Skew Problem and Its Remedy</h3>
+<p>Choosing split points that result in balanced partition sizes is critical for parallel efficiency. If one machine receives half of all tuples while the others receive one-sixth each, the entire sort is bottlenecked on that one machine — the job cannot finish faster than that machine can process its share, and the effective speedup is at most 2× regardless of the total number of machines. This imbalance is called <strong>skew</strong>.</p>
+<p>The standard remedy is to choose split points using statistics. If a histogram on <span class="math inline">\(A\)</span> is available, the split points can be chosen so that each range contains approximately <span class="math inline">\(n_R / k\)</span> tuples. If no statistics are available, <strong>sampling</strong> is used: draw a random sample of <span class="math inline">\(R\)</span> before the shuffle (e.g., 1% of tuples), examine the distribution of <span class="math inline">\(A\)</span> in the sample, and set split points accordingly. Modern systems like Spark use range partitioning with sampling for exactly this purpose.</p>
+<p>Skew is hardest to handle for <strong>intermediate results</strong> — the output of a join or aggregation that feeds into a sort or another join. Statistics may not exist for intermediate data, and the sampling must be done on the fly. This is an active area of practical concern in production parallel query systems.</p>
+<hr>
+</section>
+</section>
+<section id="parallel-join" class="level2">
+<h2 class="anchored" data-anchor-id="parallel-join">3. Parallel Join</h2>
+<section id="standard-parallel-hash-join" class="level3">
+<h3 class="anchored" data-anchor-id="standard-parallel-hash-join">3.1 Standard Parallel Hash Join</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-119.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Hash Join</figcaption>
+</figure>
+</div>
+<p>The goal is to compute <span class="math inline">\(R \bowtie_A S\)</span> where both <span class="math inline">\(R\)</span> and <span class="math inline">\(S\)</span> are partitioned across <span class="math inline">\(k\)</span> machines. The algorithm is a direct parallel extension of the single-machine hash join.</p>
+<p>Choose a hash function <span class="math inline">\(h\)</span> on the join attribute <span class="math inline">\(A\)</span>. Every machine processes its local partitions of <span class="math inline">\(R\)</span> and <span class="math inline">\(S\)</span>: each tuple with <span class="math inline">\(A = v\)</span> is sent to machine <span class="math inline">\(h(v) \bmod k\)</span>. Both R-tuples and S-tuples are rerouted this way. After the shuffle, machine <span class="math inline">\(i\)</span> holds:</p>
+<ul>
+<li>All R-tuples from the entire relation <span class="math inline">\(R\)</span> whose <span class="math inline">\(A\)</span> value hashes to <span class="math inline">\(i\)</span></li>
+<li>All S-tuples from the entire relation <span class="math inline">\(S\)</span> whose <span class="math inline">\(A\)</span> value hashes to <span class="math inline">\(i\)</span></li>
+</ul>
+<p>Each machine then performs a standard local join on its subset of R and S. The join algorithm for the local step can be anything — hash join, sort-merge join, even nested loops — since it is now a single-machine operation.</p>
+<p><strong>Correctness</strong> is straightforward: if an R-tuple has <span class="math inline">\(A = v\)</span>, it goes to machine <span class="math inline">\(h(v) \bmod k\)</span>. Every S-tuple with the same <span class="math inline">\(A = v\)</span> also goes to <span class="math inline">\(h(v) \bmod k\)</span> — the same machine. Therefore, every matching pair <span class="math inline">\((r, s)\)</span> with <span class="math inline">\(r.A = s.A\)</span> is guaranteed to land on the same machine and be found by the local join. It is impossible for the matching S-tuple to be on a different machine than its corresponding R-tuple, because they hash to the same value.</p>
+<p>This design separates two concerns: the hash function <span class="math inline">\(h\)</span> determines <em>where</em> tuples go (the redistribution step), and the local join algorithm determines <em>how</em> they are joined once they arrive. In systems like Spark, these are indeed implemented as separate stages.</p>
+<p>Both <span class="math inline">\(R\)</span> and <span class="math inline">\(S\)</span> are fully shuffled in this approach. The total data movement is <span class="math inline">\(|R| + |S|\)</span>.</p>
+</section>
+<section id="worked-example-1" class="level3">
+<h3 class="anchored" data-anchor-id="worked-example-1">3.2 Worked Example</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-120.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Hash Join — Example</figcaption>
+</figure>
+</div>
+<p>With hash function <span class="math inline">\(h(A) = A\)</span> (identity) and four machines, a tuple with <span class="math inline">\(A = 1\)</span> goes to machine 1, <span class="math inline">\(A = 2\)</span> to machine 2, and so on. After the shuffle, machine 1 holds all R-tuples and S-tuples with <span class="math inline">\(A = 1\)</span>; it joins them locally and produces join tuples. Machines with no matching tuples on one side produce no output. The full join result is the union of each machine’s local join output.</p>
+</section>
+<section id="fragment-and-replicate-for-asymmetric-relations" class="level3">
+<h3 class="anchored" data-anchor-id="fragment-and-replicate-for-asymmetric-relations">3.3 Fragment-and-Replicate for Asymmetric Relations</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-121.png" class="img-fluid figure-img"></p>
+<figcaption>Fragment-and-Replicate Join</figcaption>
+</figure>
+</div>
+<p>In many practical workloads, one join input is much smaller than the other. A typical example is a <strong>dimension table lookup</strong>: a large fact table <span class="math inline">\(R\)</span> (100 GB) is joined with a small dimension table <span class="math inline">\(S\)</span> (10 MB). The standard parallel hash join shuffles both <span class="math inline">\(R\)</span> and <span class="math inline">\(S\)</span>, moving 100 GB of <span class="math inline">\(R\)</span> plus 10 MB of <span class="math inline">\(S\)</span> across the network. But moving 100 GB is expensive — can we avoid it?</p>
+<p>The answer is <strong>fragment-and-replicate</strong>: instead of redistributing <span class="math inline">\(R\)</span>, leave each partition <span class="math inline">\(R_i\)</span> where it is and broadcast the entire <span class="math inline">\(S\)</span> to every machine. Machine <span class="math inline">\(i\)</span> then computes <span class="math inline">\(R_i \bowtie S\)</span> locally using <span class="math inline">\(R_i\)</span> (already present) and the full <span class="math inline">\(S\)</span> (just received).</p>
+<p>The communication cost is <span class="math inline">\(k \times |S|\)</span>: the full <span class="math inline">\(S\)</span> is sent to all <span class="math inline">\(k\)</span> machines. For <span class="math inline">\(|S| = 10\)</span> MB and <span class="math inline">\(k = 100\)</span> machines, that is 1 GB of total transfer for <span class="math inline">\(S\)</span> — versus 100 GB to move <span class="math inline">\(R\)</span>. As long as <span class="math inline">\(k \times |S| \ll |R|\)</span>, fragment-and-replicate wins decisively.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-122.png" class="img-fluid figure-img"></p>
+<figcaption>Fragment-and-Replicate — Example</figcaption>
+</figure>
+</div>
+<p>The asymmetry is intentional: we replicate the small relation and fragment (keep in place) the large one. The technique is only beneficial when <span class="math inline">\(|S|\)</span> is small enough that replicating it does not overwhelm the machines’ memory and network capacity. Choosing between the standard parallel hash join and fragment-and-replicate is a query optimizer decision that depends on the estimated sizes of both inputs — yet another reason why accurate cardinality estimation matters.</p>
+<hr>
+</section>
+</section>
+<section id="parallel-aggregation" class="level2">
+<h2 class="anchored" data-anchor-id="parallel-aggregation">4. Parallel Aggregation</h2>
+<p>Aggregation — <code>GROUP BY A, aggregate_function(B)</code> — is one of the most common operations in analytical workloads, and its parallel execution has more cases than sort or join because different aggregate functions have fundamentally different properties.</p>
+<p>The key distinction is <strong>decomposability</strong>: can a partial aggregate computed on a subset of the data be merged with partial aggregates from other subsets to produce the correct final result? COUNT, SUM, MIN, MAX, and AVG are all decomposable. MEDIAN and MODE are not — there is no way to compute the median of a combined dataset from the medians of its parts.</p>
+<section id="case-1-small-number-of-groups" class="level3">
+<h3 class="anchored" data-anchor-id="case-1-small-number-of-groups">4.1 Case 1: Small Number of Groups</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-123.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Aggregation — Small Groups</figcaption>
+</figure>
+</div>
+<p>When the number of distinct group keys (distinct values of <span class="math inline">\(A\)</span>) is small relative to the total data size, the following approach works well.</p>
+<p><strong>Phase 1 — Local partial aggregation.</strong> Each machine computes a partial aggregate over its own partition <span class="math inline">\(R_i\)</span>. For <code>SUM(B) GROUP BY A</code>, machine <span class="math inline">\(i\)</span> produces a list of <span class="math inline">\((A\text{-value}, \text{partial\_sum})\)</span> pairs — one per distinct value of <span class="math inline">\(A\)</span> observed in <span class="math inline">\(R_i\)</span>. This list is typically much smaller than <span class="math inline">\(R_i\)</span> itself, because many tuples with the same <span class="math inline">\(A\)</span> value collapse into a single partial aggregate.</p>
+<p><strong>Phase 2 — Collect at coordinator.</strong> All machines send their partial aggregates to a single designated coordinator machine. The coordinator merges them: for each group key, it sums all the partial sums, takes the minimum of all partial minimums, and so on.</p>
+<p>This works because the number of groups is small: even if there are 10,000 distinct group keys and <span class="math inline">\(k = 100\)</span> machines, the coordinator receives at most <span class="math inline">\(10,000 \times 100 = 1,000,000\)</span> rows — far less than the original relation. For AVG, each machine sends (partial_sum, partial_count) per group, and the coordinator computes the final average by dividing the total sum by the total count. This approach cannot be used for MEDIAN or MODE, which require the full list of values — see Case 3.</p>
+</section>
+<section id="case-2-large-number-of-groups-decomposable-aggregate" class="level3">
+<h3 class="anchored" data-anchor-id="case-2-large-number-of-groups-decomposable-aggregate">4.2 Case 2: Large Number of Groups, Decomposable Aggregate</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-124.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Aggregation — Large Groups</figcaption>
+</figure>
+</div>
+<p>When the number of distinct groups is large — for example, <code>GROUP BY user_id</code> with 100 million distinct users — collecting all partial aggregates at a single coordinator machine is impractical. That machine would receive up to <span class="math inline">\(k \times 100{,}000{,}000\)</span> rows and would become a severe bottleneck.</p>
+<p>The solution is to distribute the aggregation work across all machines using hashing.</p>
+<p><strong>Phase 1 — Local partial aggregation.</strong> Same as before: each machine computes partial aggregates over its local partition.</p>
+<p><strong>Phase 2 — Hash-redistribute partial aggregates.</strong> Each machine routes its partial aggregate for group key <span class="math inline">\(v\)</span> to machine <span class="math inline">\(h(v) \bmod k\)</span>. After this shuffle, machine <span class="math inline">\(i\)</span> holds partial aggregates from all machines for the groups whose key hashes to <span class="math inline">\(i\)</span>.</p>
+<p><strong>Phase 3 — Local final aggregation.</strong> Each machine finalizes the aggregates for its assigned groups, merging the partial results from all other machines.</p>
+<p>The final result is distributed: machine <span class="math inline">\(i\)</span> holds the correct final aggregate for all group keys that hash to <span class="math inline">\(i\)</span>. If a subsequent operator needs the complete result on a single machine, an additional collection step is required — but in many pipelines, the distributed result can be consumed directly by the next parallel operator.</p>
+<p>This is essentially the <strong>MapReduce</strong> programming model: Phase 1 is the Map (local partial aggregation), Phase 2 is the Shuffle, and Phase 3 is the Reduce (final aggregation per machine). Hadoop’s word count example, and the Spark <code>reduceByKey</code> operation, implement exactly this pattern.</p>
+</section>
+<section id="case-3-non-decomposable-aggregates-or-pure-grouping" class="level3">
+<h3 class="anchored" data-anchor-id="case-3-non-decomposable-aggregates-or-pure-grouping">4.3 Case 3: Non-Decomposable Aggregates (or Pure Grouping)</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-125.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Aggregation — Non-Decomposable</figcaption>
+</figure>
+</div>
+<p>For aggregates like MEDIAN or MODE, no partial result can be computed locally — the median of a partition is not useful for computing the median of the full dataset. The algorithm must route all raw tuples for each group to a single machine.</p>
+<p><strong>Algorithm</strong>: hash-redistribute all raw tuples by group key — every machine routes its tuple with group key <span class="math inline">\(v\)</span> to machine <span class="math inline">\(h(v) \bmod k\)</span>. Machine <span class="math inline">\(i\)</span> then collects all tuples belonging to its assigned groups from all other machines, and computes the final aggregate from the full set of raw values.</p>
+<p>There is no Phase 1 reduction. The full relation is redistributed, which makes this the most expensive aggregation case: total data movement equals <span class="math inline">\(|R|\)</span>.</p>
+<p>The same algorithm applies to <strong>pure grouping</strong> (without any aggregate function): the result of <code>GROUP BY A</code> is just the set of distinct group keys, which requires collecting all tuples per key on a single machine. Grouping does not reduce the volume of data — every input tuple must appear in the output — so there is nothing to compress during a local phase.</p>
+<hr>
+</section>
+</section>
+<section id="other-operations" class="level2">
+<h2 class="anchored" data-anchor-id="other-operations">5. Other Operations</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-126.png" class="img-fluid figure-img"></p>
+<figcaption>Other Parallel Operations</figcaption>
+</figure>
+</div>
+<p><strong>Selection (<span class="math inline">\(\sigma_\theta(R)\)</span>)</strong> is the simplest parallel operator: apply the predicate <span class="math inline">\(\theta\)</span> to each <span class="math inline">\(R_i\)</span> on machine <span class="math inline">\(i\)</span> independently. No shuffle is required. The result is still spread across <span class="math inline">\(k\)</span> machines, with machine <span class="math inline">\(i\)</span> holding the subset of <span class="math inline">\(R_i\)</span> that satisfies <span class="math inline">\(\theta\)</span>. Depending on how <span class="math inline">\(R\)</span> is partitioned, some predicates may allow the optimizer to skip entire partitions entirely — for example, if <span class="math inline">\(R\)</span> is range-partitioned on <span class="math inline">\(A\)</span> and the predicate is <span class="math inline">\(A &gt; 500\)</span>, only machines holding the range <span class="math inline">\(A &gt; 500\)</span> need to be consulted.</p>
+<p><strong>Projection (<span class="math inline">\(\Pi_L(R)\)</span>)</strong> is equally trivial: each machine drops the columns not in <span class="math inline">\(L\)</span> from its tuples locally. No shuffle is required.</p>
+<p><strong>Duplicate elimination</strong> requires one shuffle. Each machine first eliminates intra-partition duplicates locally (using sort-based or hash-based dedup). The local results are then hash-redistributed by the full tuple value, so that all copies of any given tuple land on the same machine. Each machine then eliminates the remaining duplicates among the tuples it received. This is exactly the same structure as Case 2 parallel aggregation, with “equality of all attributes” playing the role of the group key.</p>
+<p>The common thread: every non-trivial parallel operator reduces to one or more shuffles. <strong>Minimizing the number of shuffles in a query plan is the primary optimization problem in parallel query processing</strong> — more important than operator algorithm selection, because a single shuffle of a large relation dominates the execution time of a complex query. Systems like Spark model query execution as a directed acyclic graph (DAG) of stages separated by shuffles, and a major focus of the Spark optimizer is to fuse operators that can share a shuffle or eliminate redundant ones.</p>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">6. Summary</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-127.png" class="img-fluid figure-img"></p>
+<figcaption>Parallel Operators Summary</figcaption>
+</figure>
+</div>
+<p>Executing relational operators in a shared-nothing parallel system extends the single-machine algorithms with redistribution steps:</p>
+<ul>
+<li><strong>Parallel sort</strong>: local sort, range-partition shuffle, local final sort. Split-point choice is critical; skew in the distribution causes speedup to collapse. Statistics and sampling are used to choose balanced splits.</li>
+<li><strong>Parallel hash join</strong>: hash-partition both <span class="math inline">\(R\)</span> and <span class="math inline">\(S\)</span> on the join attribute using the same hash function, then local join on each machine. Correctness follows from the fact that matching tuples hash to the same machine. Fragment-and-replicate is the alternative when one relation is much smaller — replicate the small one, keep the large one in place.</li>
+<li><strong>Parallel aggregation</strong>: three scenarios. Small groups: local partial aggs, collect at one machine, final agg. Large groups with decomposable aggregates: local partial aggs, hash-redistribute partials, local final agg (MapReduce). Non-decomposable aggregates or pure grouping: hash-redistribute raw data, local final computation.</li>
+<li><strong>Selection, projection</strong>: trivially parallel with no shuffle. Duplicate elimination: two-phase hash-based, requiring one shuffle.</li>
+</ul>
+<p>The shuffle is the central, expensive primitive. Every operator that requires combining data from different machines must shuffle. Optimizing when and how shuffles occur — and building query plans that minimize them — is where most of the engineering complexity in systems like Apache Spark, Amazon Redshift, and Google BigQuery resides.</p>
+<p>This concludes the Query Processing and Optimization module. The topics covered across this module — single-machine operator implementations, query optimization (equivalence rules, cost estimation, plan search), and parallel execution — form the foundation of how every modern data system evaluates SQL queries, whether it is PostgreSQL running on a laptop or Snowflake running across thousands of machines in the cloud.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

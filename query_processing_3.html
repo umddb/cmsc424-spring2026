@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Query Processing — Sort-Merge Join, Aggregation, and External Memory – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">1. Introduction</a></li>
+  <li><a href="#sort-merge-join" id="toc-sort-merge-join" class="nav-link" data-scroll-target="#sort-merge-join">2. Sort-Merge Join</a>
+  <ul class="collapse">
+  <li><a href="#the-algorithm" id="toc-the-algorithm" class="nav-link" data-scroll-target="#the-algorithm">2.1 The Algorithm</a></li>
+  <li><a href="#cost-and-benefits" id="toc-cost-and-benefits" class="nav-link" data-scroll-target="#cost-and-benefits">2.2 Cost and Benefits</a></li>
+  <li><a href="#sort-merge-join-vs-hash-join" id="toc-sort-merge-join-vs-hash-join" class="nav-link" data-scroll-target="#sort-merge-join-vs-hash-join">2.3 Sort-Merge Join vs Hash Join</a></li>
+  <li><a href="#outer-joins-with-sort-merge" id="toc-outer-joins-with-sort-merge" class="nav-link" data-scroll-target="#outer-joins-with-sort-merge">2.4 Outer Joins with Sort-Merge</a></li>
+  </ul></li>
+  <li><a href="#summary-of-join-algorithms" id="toc-summary-of-join-algorithms" class="nav-link" data-scroll-target="#summary-of-join-algorithms">3. Summary of Join Algorithms</a></li>
+  <li><a href="#group-by-and-aggregation" id="toc-group-by-and-aggregation" class="nav-link" data-scroll-target="#group-by-and-aggregation">4. Group-By and Aggregation</a>
+  <ul class="collapse">
+  <li><a href="#hash-based-approach" id="toc-hash-based-approach" class="nav-link" data-scroll-target="#hash-based-approach">4.1 Hash-Based Approach</a></li>
+  <li><a href="#iterator-model-implementation" id="toc-iterator-model-implementation" class="nav-link" data-scroll-target="#iterator-model-implementation">4.2 Iterator Model Implementation</a></li>
+  <li><a href="#sort-based-approach" id="toc-sort-based-approach" class="nav-link" data-scroll-target="#sort-based-approach">4.3 Sort-Based Approach</a></li>
+  </ul></li>
+  <li><a href="#duplicate-elimination" id="toc-duplicate-elimination" class="nav-link" data-scroll-target="#duplicate-elimination">5. Duplicate Elimination</a></li>
+  <li><a href="#set-operations" id="toc-set-operations" class="nav-link" data-scroll-target="#set-operations">6. Set Operations</a></li>
+  <li><a href="#external-memory-algorithms" id="toc-external-memory-algorithms" class="nav-link" data-scroll-target="#external-memory-algorithms">7. External Memory Algorithms</a>
+  <ul class="collapse">
+  <li><a href="#partitioned-external-hash-join" id="toc-partitioned-external-hash-join" class="nav-link" data-scroll-target="#partitioned-external-hash-join">7.1 Partitioned (External) Hash Join</a></li>
+  <li><a href="#external-sort-merge" id="toc-external-sort-merge" class="nav-link" data-scroll-target="#external-sort-merge">7.2 External Sort-Merge</a></li>
+  </ul></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">8. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Query Processing — Sort-Merge Join, Aggregation, and External Memory</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">1. Introduction</h2>
+<p>In the previous set of notes, we covered selection implementations (sequential scan, index scan) and join implementations (nested loops, index nested loops, hash join, and hash-based outer joins). We now complete our tour of query operator implementations with three remaining topics.</p>
+<p>First, we cover <strong>sort-merge join</strong>, a join algorithm that takes a fundamentally different approach from hash join and nested loops — one based on the merge step of merge sort. Second, we cover several additional operators: <strong>group-by and aggregation</strong>, <strong>duplicate elimination</strong>, and <strong>set operations</strong> (UNION, INTERSECT, EXCEPT). Finally, we address a practical but important situation: what happens when a relation is <strong>too large to fit in memory</strong>? We discuss two external memory algorithms — partitioned hash join and external sort-merge — that handle this case through a divide-and-conquer approach.</p>
+<p>These external memory ideas are also the conceptual foundation for joins in distributed systems like Apache Spark, so they are worth understanding even if you rarely encounter them in single-machine settings today.</p>
+<hr>
+</section>
+<section id="sort-merge-join" class="level2">
+<h2 class="anchored" data-anchor-id="sort-merge-join">2. Sort-Merge Join</h2>
+<section id="the-algorithm" class="level3">
+<h3 class="anchored" data-anchor-id="the-algorithm">2.1 The Algorithm</h3>
+<p>Every join algorithm we have seen so far has an asymmetric structure: one relation plays the “outer” role (we iterate over it) and the other plays the “inner” role (we look things up in it). Sort-merge join is different — it treats both relations symmetrically and processes them in lockstep.</p>
+<p>The precondition for sort-merge join is that <strong>both relations must be sorted on the join attribute</strong>. If they are not already sorted, a separate sort step must precede the join. In database systems, sorting is implemented as a dedicated physical operator (not baked into the join) precisely because it is needed by so many operations — aggregation, duplicate elimination, set operations, and ORDER BY, in addition to sort-merge join.</p>
+<p>Once both relations are sorted, the merge proceeds exactly as in the merge step of merge sort. Maintain one pointer into each relation. At each step, compare the join attribute values at the two current positions:</p>
+<ul>
+<li>If they are equal, the two tuples join — emit the result tuple and advance one of the pointers.</li>
+<li>If the left value is smaller, the left pointer’s tuple cannot join with anything in the right relation (since both are sorted and all remaining right values are at least as large). Advance the left pointer.</li>
+<li>If the right value is smaller, advance the right pointer.</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-034.png" class="img-fluid figure-img"></p>
+<figcaption>Sort-Merge Join Algorithm</figcaption>
+</figure>
+</div>
+<p>There is one complication: the join attribute may not be unique, so duplicate values can appear in both relations. When the current values in both relations are equal, there may be a <em>group</em> of matching tuples on each side, all of which must be combined with each other. The algorithm must track the start of each matching group and reset the pointer when processing the next tuple. This requires a little extra bookkeeping, but the logic is not fundamentally more complex. If you have reviewed merge sort recently, this algorithm should feel very familiar — the difference is only that we produce join tuples rather than a merged sorted sequence.</p>
+</section>
+<section id="cost-and-benefits" class="level3">
+<h3 class="anchored" data-anchor-id="cost-and-benefits">2.2 Cost and Benefits</h3>
+<p>If both relations are already sorted on the join attribute, sort-merge join is optimal: it reads each block of R and S exactly once, for a total cost of <strong>b_R + b_S</strong> block transfers. You cannot do better than this — any join algorithm must at minimum read both relations. If the relations are not pre-sorted, the sorting cost must be added, but sorting is itself a well-optimized operation.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-035.png" class="img-fluid figure-img"></p>
+<figcaption>Sort-Merge Join Cost and Properties</figcaption>
+</figure>
+</div>
+<p>The key advantage of sort-merge join over hash join is <strong>memory efficiency</strong>. Hash join requires holding all of the smaller relation in memory (as a hash table). Sort-merge join only needs to maintain the two current pointers and a small amount of buffer — effectively a few blocks at a time. For very large relations with limited memory, this matters significantly.</p>
+<p>A second noteworthy property is that <strong>the output of sort-merge join is sorted on the join attribute</strong>. This can be exploited by operators further up the query plan — for example, a duplicate elimination or an ORDER BY that would otherwise require an additional sort can often be eliminated or made cheaper. Earlier database systems often preferred sort-merge join specifically because of this property, and PostgreSQL still exploits it when generating query plans.</p>
+</section>
+<section id="sort-merge-join-vs-hash-join" class="level3">
+<h3 class="anchored" data-anchor-id="sort-merge-join-vs-hash-join">2.3 Sort-Merge Join vs Hash Join</h3>
+<p>How do these two algorithms compare overall? This question has generated a surprisingly rich debate in the database literature over the past few decades, with papers in the 1990s and 2000s alternately arguing that hashing or sorting is superior. The honest answer is that they are roughly equivalent — both read each relation a small, bounded number of times, and both have the same asymptotic I/O complexity.</p>
+<p>For large-memory systems, hash join tends to have slightly better constants because it avoids the overhead of sorting. But the difference is often small, and the choice can flip depending on the specific hardware, data distribution, and workload. In practice, if you were building a new system today, either is a perfectly valid default. Many production databases (including PostgreSQL) implement both and let the query optimizer choose based on estimated costs.</p>
+</section>
+<section id="outer-joins-with-sort-merge" class="level3">
+<h3 class="anchored" data-anchor-id="outer-joins-with-sort-merge">2.4 Outer Joins with Sort-Merge</h3>
+<p>Just as hash join can be extended to support outer joins (as covered in the previous set of notes), sort-merge join can also be extended to handle left outer, right outer, and full outer joins — and the extension is quite natural.</p>
+<p>During the merge, whenever the left pointer’s current value is smaller than the right pointer’s current value, we know that the left tuple has no matching partner in the right relation. In a regular inner join, we simply skip it. In a left outer join, we instead emit it padded with NULLs. The same logic applies symmetrically for right outer join. The code changes are minor — a few extra checks and an emission step for unmatched tuples.</p>
+<p>This is in contrast to index nested loops join, where right outer join is awkward: the algorithm naturally visits every R tuple and can detect when it has no match, but identifying unmatched S tuples requires a separate scan of S. With sort-merge, both sides are traversed simultaneously, so both directions of unmatched detection are equally easy.</p>
+<hr>
+</section>
+</section>
+<section id="summary-of-join-algorithms" class="level2">
+<h2 class="anchored" data-anchor-id="summary-of-join-algorithms">3. Summary of Join Algorithms</h2>
+<p>At this point, we have covered four join algorithms. It is worth summarizing their characteristics before moving on.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-036.png" class="img-fluid figure-img"></p>
+<figcaption>Join Algorithms Summary</figcaption>
+</figure>
+</div>
+<p><strong>Nested loops join</strong> is the simplest: two for-loops, one over R and one over S. It is always applicable (any join condition, any data), but its cost is O(|R| × |S|) — prohibitively expensive for large relations. Database systems use it only when one of the relations is very small (often reduced to a handful of tuples by a preceding selection).</p>
+<p><strong>Index nested loops join</strong> replaces the inner loop with an index lookup on S. It is restricted to conditions where an appropriate index exists (typically equi-joins or range conditions), but when applicable and when R has few tuples, it can be dramatically faster than the alternatives. However, the performance depends heavily on accurate row count estimates — if the optimizer thinks R will have 10 tuples but it actually has 100,000, the plan degrades badly.</p>
+<p><strong>Hash join</strong> is the workhorse of modern database systems for large-relation equi-joins. Build a hash table on the smaller relation, probe with the larger. Its cost is essentially O(|R| + |S|) — linear in both inputs. It only supports equi-joins (range conditions cannot be answered with a hash table), but equi-joins are by far the most common case. You will see hash joins in PostgreSQL <code>EXPLAIN</code> output very frequently.</p>
+<p><strong>Sort-merge join</strong> achieves the same O(|R| + |S|) cost as hash join (when both are pre-sorted), uses less memory, and produces sorted output. Its main disadvantage is the need to sort both inputs first if they are not already sorted. Like hash join, it is primarily used for equi-joins.</p>
+<hr>
+</section>
+<section id="group-by-and-aggregation" class="level2">
+<h2 class="anchored" data-anchor-id="group-by-and-aggregation">4. Group-By and Aggregation</h2>
+<p>SQL’s <code>GROUP BY</code> clause combined with aggregate functions (COUNT, SUM, AVG, MIN, MAX) is one of the most heavily used features in analytical queries. Implementing it efficiently is an important part of a database system’s job.</p>
+<section id="hash-based-approach" class="level3">
+<h3 class="anchored" data-anchor-id="hash-based-approach">4.1 Hash-Based Approach</h3>
+<p>The hash-based approach maintains a hash table whose <strong>keys are the grouping attribute values</strong> and whose <strong>values are the running aggregate state</strong> for each group. As tuples are processed one by one, each tuple is hashed to find its group’s entry in the hash table, and the aggregate state for that group is updated.</p>
+<p>Consider the query <code>SELECT A, COUNT(B) FROM R GROUP BY A</code>. We process R’s tuples in any order:</p>
+<ul>
+<li>When we see a tuple with A=1, we look up key 1 in the hash table. If no entry exists, we create one with count=0. We then increment the count to 1.</li>
+<li>For the next tuple with A=2, we create a new entry with count=1.</li>
+<li>For a second tuple with A=1, we look up key 1 and increment its count to 2.</li>
+<li>And so on.</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-037.png" class="img-fluid figure-img"></p>
+<figcaption>Group-By: Hash-Based Algorithm</figcaption>
+</figure>
+</div>
+<p>The key insight is that we need not store the actual tuples in the hash table — only the aggregate state. The amount of state per group depends on which aggregate we are computing:</p>
+<ul>
+<li><strong>COUNT</strong>: a single integer counter.</li>
+<li><strong>SUM</strong>: a single running sum.</li>
+<li><strong>MIN, MAX</strong>: a single running minimum or maximum.</li>
+<li><strong>AVERAGE</strong>: two values — a running sum and a running count. We divide at the end.</li>
+<li><strong>Standard deviation</strong>: sum, sum-of-squares, and count — three values suffice via the online formula.</li>
+<li><strong>COUNT DISTINCT, MEDIAN, MODE</strong>: these have no compact running representation. We must collect the full list of values for each group and process them at the end. For MEDIAN, sorting the group’s values at the end is the typical approach.</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-039.png" class="img-fluid figure-img"></p>
+<figcaption>Group-By: Aggregate Functions</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-040.png" class="img-fluid figure-img"></p>
+<figcaption>Group-By: Average and Median</figcaption>
+</figure>
+</div>
+<p>In PostgreSQL, the physical <code>HashAggregate</code> operator handles COUNT, SUM, MIN, MAX, and AVG within a single implementation using overloaded aggregate transition functions. Median and mode are handled by separate code paths. The conceptual structure — a hash table updated tuple-by-tuple — is the same.</p>
+</section>
+<section id="iterator-model-implementation" class="level3">
+<h3 class="anchored" data-anchor-id="iterator-model-implementation">4.2 Iterator Model Implementation</h3>
+<p>There is an important subtlety in fitting hash-based aggregation into the iterator model. Recall that <code>next()</code> is supposed to return one tuple at a time. But hash-based aggregation is an inherently <strong>blocking</strong> operator: we must process all input tuples before we can produce any output, because a later tuple might update a group we already partially computed.</p>
+<p>The standard solution is lazy initialization: the hash table is not built during <code>open()</code>, but rather during the <strong>first call to <code>next()</code></strong>. The <code>open()</code> call simply creates the data structure and sets a flag indicating that the hash table has not yet been populated. When <code>next()</code> is first called and the flag indicates the table is empty, the operator reads all of R, builds the complete hash table, and then begins returning one entry at a time. Subsequent calls to <code>next()</code> simply pop the next entry from the completed table.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-038.png" class="img-fluid figure-img"></p>
+<figcaption>Group-By: Iterator Model Implementation</figcaption>
+</figure>
+</div>
+<p>This lazy-first-call pattern is the standard way to handle blocking operators in the iterator model. It ensures that <code>open()</code> is cheap and predictable (consistent with the convention that <code>open()</code> should not touch data), while the actual computation happens the first time output is requested.</p>
+</section>
+<section id="sort-based-approach" class="level3">
+<h3 class="anchored" data-anchor-id="sort-based-approach">4.3 Sort-Based Approach</h3>
+<p>An alternative is the sort-based approach. Sort the relation by the grouping attribute first. After sorting, all tuples belonging to the same group are contiguous. A single pass over the sorted relation then suffices: maintain the current group key and running aggregate; when the key changes, emit the previous group’s result and start a new one.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-041.png" class="img-fluid figure-img"></p>
+<figcaption>Group-By: Sort-Based Algorithm</figcaption>
+</figure>
+</div>
+<p>The sort-based approach is often simpler to implement correctly, and it handles order-sensitive aggregates (median, mode) more naturally — once the group’s tuples are contiguous and already sorted, finding the median is trivial. It is particularly attractive when the data arrives pre-sorted (e.g., as output from a sort-merge join or an ordered index scan), in which case the sorting cost is zero. For fresh unsorted data, the overhead of sorting must be weighed against the hash table construction cost of the hash-based approach.</p>
+<hr>
+</section>
+</section>
+<section id="duplicate-elimination" class="level2">
+<h2 class="anchored" data-anchor-id="duplicate-elimination">5. Duplicate Elimination</h2>
+<p>Duplicate elimination — the physical operation behind <code>SELECT DISTINCT</code> — is closely related to grouping and uses the same two basic strategies.</p>
+<p>The <strong>sort-based approach</strong> (shown in the slide below) is straightforward: sort the relation, then scan it linearly. Each tuple is compared to the previous one; if they are identical, discard the current tuple. If they differ, emit it. Because identical tuples are adjacent after sorting, this single pass eliminates all duplicates.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-046.png" class="img-fluid figure-img"></p>
+<figcaption>Duplicate Elimination</figcaption>
+</figure>
+</div>
+<p>The <strong>hash-based approach</strong> builds a hash set rather than a hash table: when a tuple is encountered, hash it and check whether it already appears in the set. If not, add it and emit it; if yes, discard it. This is essentially a group-by with no aggregate — we just want to know which groups exist.</p>
+<p>In PostgreSQL, the same <code>HashAggregate</code> physical operator that implements group-by also implements duplicate elimination. There is no separate “distinct” operator in the execution engine — both logical operations map to the same physical code. This is a concrete example of the general principle that physical operators can handle multiple logical operations, and that the distinction between physical and logical operators is meaningful and important.</p>
+<hr>
+</section>
+<section id="set-operations" class="level2">
+<h2 class="anchored" data-anchor-id="set-operations">6. Set Operations</h2>
+<p>SQL’s set operators — UNION, UNION ALL, INTERSECT, and EXCEPT — have straightforward implementations built from the primitives we have already discussed.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-047.png" class="img-fluid figure-img"></p>
+<figcaption>Set Operations</figcaption>
+</figure>
+</div>
+<p><strong>UNION ALL</strong> is the simplest case: output all tuples from R followed by all tuples from S, with no deduplication. The physical plan is simply an <code>Append</code> operator that concatenates two input streams. No extra computation is required.</p>
+<p><strong>UNION</strong> requires deduplication: output every distinct tuple that appears in R or S. The logical plan is: append R and S, then apply duplicate elimination. In PostgreSQL, this becomes <code>Append → HashAggregate</code>. Note that even though the query contains no GROUP BY or aggregate functions, the physical operator used is <code>HashAggregate</code> — because that is the physical operator that implements deduplication in PostgreSQL. This is another illustration of why the physical and logical layers must be understood separately.</p>
+<p><strong>INTERSECT</strong> asks for tuples that appear in both R and S, with duplicates removed. Semantically, this is equivalent to a natural join on all attributes: a tuple appears in the intersection if and only if it matches in both relations. Accordingly, INTERSECT can be (and often is) implemented using standard join algorithms. PostgreSQL uses a <code>HashSetOp Intersect</code> operator internally.</p>
+<p><strong>EXCEPT</strong> (or MINUS in some dialects) asks for tuples that appear in R but not in S. This is an anti-join: retain R tuples that have no matching partner in S. It can be implemented similarly to INTERSECT with appropriate modifications to the matching logic.</p>
+<p>A useful observation from seeing these operators in a live PostgreSQL query plan: the system chose <code>HashAggregate</code> for UNION even though the query contained no aggregation. This nicely illustrates how the database’s physical operator vocabulary is smaller than the SQL vocabulary — a few general-purpose physical operators (hash table building, sorting, appending) implement a much larger set of logical constructs.</p>
+<hr>
+</section>
+<section id="external-memory-algorithms" class="level2">
+<h2 class="anchored" data-anchor-id="external-memory-algorithms">7. External Memory Algorithms</h2>
+<p>All of the join, aggregation, and sorting algorithms discussed so far share a common assumption: at least one of the relations (or some critical data structure built from it) fits entirely in memory. This assumption is increasingly often satisfied — modern servers can have hundreds of gigabytes of RAM, and many working datasets fit comfortably. But when relations are very large, or when many queries are running simultaneously and competing for memory, this assumption breaks down.</p>
+<p>When it does, we need <strong>external memory algorithms</strong> — divide-and-conquer strategies that explicitly manage what lives in memory versus on disk. There are two main approaches: partitioned hash join and external sort-merge. Notably, the same ideas that solve this problem on a single machine also solve the problem of doing joins across multiple machines in distributed systems like Apache Spark — we will revisit this connection when we discuss parallel architectures.</p>
+<section id="partitioned-external-hash-join" class="level3">
+<h3 class="anchored" data-anchor-id="partitioned-external-hash-join">7.1 Partitioned (External) Hash Join</h3>
+<p>Recall the simple hash join: read S into memory, build a hash table on the join attribute, then probe with R. If S is too large to fit in memory, we cannot build this hash table.</p>
+<p>The partitioned hash join solves this by <strong>splitting both relations into smaller pieces</strong> before attempting to join them.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-049.png" class="img-fluid figure-img"></p>
+<figcaption>Hash Join: Basic Recap</figcaption>
+</figure>
+</div>
+<p><strong>The key insight</strong>: if we partition both R and S on the join attribute using the <em>same</em> partitioning function, then a tuple in partition Rᵢ can only possibly join with a tuple in partition Sᵢ — never with a tuple in Sⱼ for j ≠ i. This is because the join is an equality condition on the partitioned attribute, and the partitioning ensures that Rᵢ and Sᵢ contain exactly the same set of join attribute values. Therefore:</p>
+<p><span class="math display">\[R \bowtie S = (R_1 \bowtie S_1) \cup (R_2 \bowtie S_2) \cup \cdots \cup (R_N \bowtie S_N)\]</span></p>
+<p>We can join the partition pairs independently and concatenate the results.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-050.png" class="img-fluid figure-img"></p>
+<figcaption>External Hash Join: Phase 1 — Partitioning</figcaption>
+</figure>
+</div>
+<p><strong>Phase 1 — Partitioning</strong>: choose a number of partitions N such that each Sᵢ will fit in memory. Scan S and route each tuple to partition Sᵢ = h₁(s.joinattr) mod N, writing each partition to disk. Do the same for R. At the end of Phase 1, we have N partition files for R and N partition files for S, all on disk.</p>
+<p><strong>Phase 2 — Joining</strong>: for each i from 1 to N, read partition Sᵢ into memory, build a hash table on it using a <em>second</em> hash function h₂, then scan Rᵢ and probe the hash table to find matches. Emit all joining tuples.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-051.png" class="img-fluid figure-img"></p>
+<figcaption>External Hash Join: Phase 2 — Join</figcaption>
+</figure>
+</div>
+<p><strong>Why two hash functions?</strong> The first function h₁ is used for partitioning — it determines which of the N partitions a tuple belongs to. The second function h₂ is used inside the in-memory hash table within each partition. These must be different functions; using the same function for both would cause all tuples with the same join attribute value to hash to the same bucket in the in-memory table, degrading performance.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-052.png" class="img-fluid figure-img"></p>
+<figcaption>External Hash Join: Summary</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-053.png" class="img-fluid figure-img"></p>
+<figcaption>External Hash Join: Partitioning Diagram</figcaption>
+</figure>
+</div>
+<p><strong>Cost</strong>: Phase 1 reads R and S once and writes N partition files for each (total: 2 × (b_R + b_S) writes). Phase 2 reads all partitions once more (total: b_R + b_S reads). Overall, each block of R and S is read and written approximately 3 times — significantly more than the simple in-memory hash join.</p>
+<p><strong>Practical challenges</strong>: Guaranteeing that each Sᵢ fits in memory requires that h₁ distributes tuples uniformly across partitions. Real hash functions have variance — some partitions may end up larger than others due to data skew or an unlucky hash function. The standard practice is to create more partitions than strictly necessary to absorb this variance. If a partition still turns out to be too large, it can be re-partitioned recursively using a different hash function.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-054.png" class="img-fluid figure-img"></p>
+<figcaption>External Hash Join: Issues</figcaption>
+</figure>
+</div>
+<p><strong>Practical reality today</strong>: this algorithm is expensive precisely because everything goes to disk during Phase 1. In modern systems with large memories, you rarely need it — most relations fit comfortably in memory. The partitioned hash join is more important as a conceptual foundation for distributed join processing: in Apache Spark, the “partitions” are sent to different machines across a network rather than to different files on disk. The algorithm structure is identical.</p>
+</section>
+<section id="external-sort-merge" class="level3">
+<h3 class="anchored" data-anchor-id="external-sort-merge">7.2 External Sort-Merge</h3>
+<p>Sorting is one of the most fundamental operations in database query processing. It underlies sort-merge joins, duplicate elimination, aggregation (sort-based), and any query with an ORDER BY clause. When a relation fits in memory, we can use any standard in-memory sort algorithm — Quicksort is typically the best choice in practice due to excellent cache performance. When the relation does not fit in memory, we use <strong>external sort-merge</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-055.png" class="img-fluid figure-img"></p>
+<figcaption>Sorting: Overview and Motivation</figcaption>
+</figure>
+</div>
+<p>The algorithm has two phases.</p>
+<p><strong>Phase 1 — Creating sorted runs</strong>: Read as many blocks of the relation as fit in memory (M blocks at a time). Sort this in-memory chunk using Quicksort and write it back to disk as a <strong>sorted run</strong>. Repeat for the next M blocks, and continue until the entire relation has been processed. After Phase 1, the relation on disk has been divided into ⌈b_S / M⌉ sorted runs, each of length M blocks. The runs are sorted internally, but not yet merged with each other.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-056.png" class="img-fluid figure-img"></p>
+<figcaption>External Sort-Merge</figcaption>
+</figure>
+</div>
+<p><strong>Phase 2 — Merging</strong>: Merge all the sorted runs simultaneously using an N-way merge, where N is the number of runs. This is exactly the merge step of merge sort, generalized to N inputs. Maintain one buffer block per run and one output buffer. At each step, find the minimum current value across all run buffers, emit it, and advance the corresponding run’s pointer. This requires N + 1 blocks of memory — one per run plus one for output.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-057.png" class="img-fluid figure-img"></p>
+<figcaption>External Sort-Merge: Details</figcaption>
+</figure>
+</div>
+<p><strong>Memory requirement</strong>: Phase 1 creates ⌈b_S / M⌉ runs. Phase 2 needs one buffer block per run, so we need memory for ⌈b_S / M⌉ + 1 blocks during merging. For Phase 2 to be feasible with M blocks of memory, we need M ≥ √b_S. For a relation of 1 million blocks, this means needing only 1,000 blocks of memory — a very easy requirement to satisfy in practice. Almost all real-world cases need only this single merge pass (two phases total). Recursive merging (merging the runs in groups before a final merge) is theoretically possible but rarely necessary.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-058.png" class="img-fluid figure-img"></p>
+<figcaption>External Sort-Merge: Example</figcaption>
+</figure>
+</div>
+<p>The example in the slide illustrates the algorithm concretely: a relation of 12 tuples, memory holding 3 tuples at a time. Phase 1 creates 4 sorted runs. Because memory cannot hold all 4 run buffers simultaneously in this tiny example, Phase 2 must merge in two sub-steps — but this is an artifact of the extremely small memory size in the illustration, not a typical behavior in practice.</p>
+<p><strong>External sort-merge vs partitioned hash join</strong>: for the specific problem of sorting, external sort-merge is the clear choice — hash join is a join algorithm, not a sort algorithm. For the problem of joining two large relations, both are applicable, and both have similar total I/O costs. External sort-merge (applied to produce sorted input for a sort-merge join) is generally preferred if you are building a system and want to implement only one external join strategy: it is simpler to implement, does not require a good hash function, and produces sorted output that benefits downstream operators.</p>
+<hr>
+</section>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">8. Summary</h2>
+<p>This set of notes completes our coverage of query operator implementations. The key takeaways:</p>
+<p><strong>Sort-Merge Join</strong>: a symmetric join algorithm that operates on pre-sorted relations. Cost equals b_R + b_S (optimal) when inputs are already sorted. Requires much less memory than hash join. Produces sorted output, which can eliminate downstream sort steps. Roughly equivalent to hash join in overall cost; both are good choices.</p>
+<p><strong>Group-By and Aggregation</strong>: the hash-based approach maintains a running aggregate state per group in a hash table — compact and efficient for COUNT, SUM, MIN, MAX, and AVG. Aggregates like MEDIAN require storing full value lists. The sort-based approach first sorts on the grouping key and then scans contiguous groups — simpler code, better for order-sensitive aggregates, preferred when input is already sorted.</p>
+<p><strong>Duplicate Elimination</strong>: sort-based (compare consecutive tuples) or hash-based (hash set). PostgreSQL implements both duplicate elimination and grouping with the same <code>HashAggregate</code> physical operator, illustrating that one physical operator can serve multiple logical functions.</p>
+<p><strong>Set Operations</strong>: UNION ALL is a free append. UNION, INTERSECT, and EXCEPT require deduplication or join-like processing and are implemented via standard hash or sort-based techniques.</p>
+<p><strong>External Memory</strong>: when relations exceed available memory, divide-and-conquer strategies extend in-memory algorithms to disk. Partitioned hash join splits both relations on the join attribute (requiring two hash functions and ~3× the I/O of simple hash join). External sort-merge creates sorted runs and merges them (requiring only √b_S memory). These algorithms also underlie distributed joins in systems like Apache Spark, where “partitions” are sent to different machines rather than different disk files.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Query Processing — Join Size Estimation and Optimization Algorithms – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">1. Introduction</a></li>
+  <li><a href="#estimating-join-result-sizes" id="toc-estimating-join-result-sizes" class="nav-link" data-scroll-target="#estimating-join-result-sizes">2. Estimating Join Result Sizes</a>
+  <ul class="collapse">
+  <li><a href="#case-1-a-is-a-primary-key-for-s" id="toc-case-1-a-is-a-primary-key-for-s" class="nav-link" data-scroll-target="#case-1-a-is-a-primary-key-for-s">2.1 Case 1: A is a Primary Key for S</a></li>
+  <li><a href="#case-2-a-is-a-primary-key-for-r-symmetric" id="toc-case-2-a-is-a-primary-key-for-r-symmetric" class="nav-link" data-scroll-target="#case-2-a-is-a-primary-key-for-r-symmetric">2.2 Case 2: A is a Primary Key for R (Symmetric)</a></li>
+  <li><a href="#case-3-a-is-not-a-key-for-either-relation" id="toc-case-3-a-is-not-a-key-for-either-relation" class="nav-link" data-scroll-target="#case-3-a-is-not-a-key-for-either-relation">2.3 Case 3: A is Not a Key for Either Relation</a></li>
+  <li><a href="#when-neither-relation-has-a-key-multiplicative-blowup" id="toc-when-neither-relation-has-a-key-multiplicative-blowup" class="nav-link" data-scroll-target="#when-neither-relation-has-a-key-multiplicative-blowup">2.4 When Neither Relation Has a Key: Multiplicative Blowup</a></li>
+  <li><a href="#incorporating-selections" id="toc-incorporating-selections" class="nav-link" data-scroll-target="#incorporating-selections">2.5 Incorporating Selections</a></li>
+  </ul></li>
+  <li><a href="#the-full-optimization-pipeline" id="toc-the-full-optimization-pipeline" class="nav-link" data-scroll-target="#the-full-optimization-pipeline">3. The Full Optimization Pipeline</a></li>
+  <li><a href="#the-search-problem" id="toc-the-search-problem" class="nav-link" data-scroll-target="#the-search-problem">4. The Search Problem</a></li>
+  <li><a href="#heuristic-optimization" id="toc-heuristic-optimization" class="nav-link" data-scroll-target="#heuristic-optimization">5. Heuristic Optimization</a></li>
+  <li><a href="#cost-based-search-dynamic-programming" id="toc-cost-based-search-dynamic-programming" class="nav-link" data-scroll-target="#cost-based-search-dynamic-programming">6. Cost-Based Search: Dynamic Programming</a>
+  <ul class="collapse">
+  <li><a href="#the-key-insight-optimal-substructure" id="toc-the-key-insight-optimal-substructure" class="nav-link" data-scroll-target="#the-key-insight-optimal-substructure">6.1 The Key Insight: Optimal Substructure</a></li>
+  <li><a href="#the-algorithm" id="toc-the-algorithm" class="nav-link" data-scroll-target="#the-algorithm">6.2 The Algorithm</a></li>
+  <li><a href="#complexity" id="toc-complexity" class="nav-link" data-scroll-target="#complexity">6.3 Complexity</a></li>
+  <li><a href="#left-deep-vs-bushy-plans" id="toc-left-deep-vs-bushy-plans" class="nav-link" data-scroll-target="#left-deep-vs-bushy-plans">6.4 Left-Deep vs Bushy Plans</a></li>
+  </ul></li>
+  <li><a href="#practical-considerations" id="toc-practical-considerations" class="nav-link" data-scroll-target="#practical-considerations">7. Practical Considerations</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">8. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Query Processing — Join Size Estimation and Optimization Algorithms</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">1. Introduction</h2>
+<p>The previous set of notes covered how to estimate the sizes of single-relation selections using statistics: distinct value counts, most common values, and histograms. We now complete the cost estimation picture by addressing <strong>join size estimation</strong> — how many tuples does a join produce? — and then turn to the third and final piece of query optimization: the <strong>search algorithms</strong> that actually find a good plan without enumerating all possible plans.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-091.png" class="img-fluid figure-img"></p>
+<figcaption>Query Optimization Outline</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="estimating-join-result-sizes" class="level2">
+<h2 class="anchored" data-anchor-id="estimating-join-result-sizes">2. Estimating Join Result Sizes</h2>
+<p>For a join <span class="math inline">\(R \bowtie_A S\)</span> on attribute <span class="math inline">\(A\)</span>, we need to estimate the number of output tuples. The key insight is to think about a single tuple of <span class="math inline">\(R\)</span> and ask: <em>how many tuples in <span class="math inline">\(S\)</span> does it match on average?</em> The total result size is then <span class="math inline">\(n_R \times \text{(average matches per R tuple)}\)</span>.</p>
+<section id="case-1-a-is-a-primary-key-for-s" class="level3">
+<h3 class="anchored" data-anchor-id="case-1-a-is-a-primary-key-for-s">2.1 Case 1: A is a Primary Key for S</h3>
+<p>If <span class="math inline">\(A\)</span> is a primary key for <span class="math inline">\(S\)</span>, then by definition no two tuples in <span class="math inline">\(S\)</span> share the same <span class="math inline">\(A\)</span> value. Therefore, any given tuple in <span class="math inline">\(R\)</span> with value <span class="math inline">\(A = v\)</span> has <strong>at most one</strong> matching tuple in <span class="math inline">\(S\)</span>. Assuming referential integrity (no dangling foreign key references), there is exactly one match for every R tuple that has a corresponding value in S. The result size is:</p>
+<p><span class="math display">\[|R \bowtie_A S| \approx n_R\]</span></p>
+<p><strong>Example</strong>: <span class="math inline">\(V(B, R) = 100\)</span>, <span class="math inline">\(n_R = 1000\)</span>; <span class="math inline">\(B\)</span> is primary key for <span class="math inline">\(S\)</span>, <span class="math inline">\(n_S = 500\)</span>. Each of the 1000 R tuples finds at most one match in S. Result size = 1000.</p>
+</section>
+<section id="case-2-a-is-a-primary-key-for-r-symmetric" class="level3">
+<h3 class="anchored" data-anchor-id="case-2-a-is-a-primary-key-for-r-symmetric">2.2 Case 2: A is a Primary Key for R (Symmetric)</h3>
+<p>By symmetry: if <span class="math inline">\(A\)</span> is a primary key for <span class="math inline">\(R\)</span>, then each <span class="math inline">\(S\)</span> tuple matches at most one <span class="math inline">\(R\)</span> tuple, and the result size is at most <span class="math inline">\(n_S\)</span>.</p>
+</section>
+<section id="case-3-a-is-not-a-key-for-either-relation" class="level3">
+<h3 class="anchored" data-anchor-id="case-3-a-is-not-a-key-for-either-relation">2.3 Case 3: A is Not a Key for Either Relation</h3>
+<p>This is the general case. Under the uniformity assumption: if <span class="math inline">\(V(A, S) = d\)</span> distinct values of <span class="math inline">\(A\)</span> appear in <span class="math inline">\(S\)</span> and there are <span class="math inline">\(n_S\)</span> total tuples, then on average each distinct value of <span class="math inline">\(A\)</span> appears <span class="math inline">\(n_S / V(A, S)\)</span> times in <span class="math inline">\(S\)</span>. A given R tuple with value <span class="math inline">\(A = v\)</span> can therefore expect <span class="math inline">\(n_S / V(A, S)\)</span> matches in S. Multiplying across all R tuples:</p>
+<p><span class="math display">\[|R \bowtie_A S| \approx n_R \times \frac{n_S}{V(A, S)}\]</span></p>
+<p>By symmetry, an equally valid estimate is <span class="math inline">\(n_R \times n_S / V(A, R)\)</span>. In practice, the standard formula takes the maximum of the two distinct-value counts in the denominator — this is conservative (tends to underestimate rather than overestimate, which is generally safer for optimization):</p>
+<p><span class="math display">\[|R \bowtie_A S| \approx \frac{n_R \times n_S}{\max(V(A, R),\; V(A, S))}\]</span></p>
+<p><strong>Example</strong> (worked on the whiteboard): <span class="math inline">\(n_R = 1000\)</span>, <span class="math inline">\(V(B, R) = 100\)</span>, <span class="math inline">\(n_S = 500\)</span>, <span class="math inline">\(V(B, S) = 250\)</span>.</p>
+<ul>
+<li>Each R tuple has <span class="math inline">\(A = v\)</span> for some <span class="math inline">\(v\)</span>. In <span class="math inline">\(S\)</span>, value <span class="math inline">\(v\)</span> appears on average <span class="math inline">\(500 / 250 = 2\)</span> times.</li>
+<li>Total result size: <span class="math inline">\(1000 \times 2 = 2000\)</span>.</li>
+</ul>
+<p>Using the formula directly: <span class="math inline">\(1000 \times 500 / \max(100, 250) = 500000 / 250 = 2000\)</span>. ✓</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-089.png" class="img-fluid figure-img"></p>
+<figcaption>Join Size Estimation: Cases 1 and 2</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-090.png" class="img-fluid figure-img"></p>
+<figcaption>Join Size Estimation: Case 3 and Formula</figcaption>
+</figure>
+</div>
+</section>
+<section id="when-neither-relation-has-a-key-multiplicative-blowup" class="level3">
+<h3 class="anchored" data-anchor-id="when-neither-relation-has-a-key-multiplicative-blowup">2.4 When Neither Relation Has a Key: Multiplicative Blowup</h3>
+<p>The formula <span class="math inline">\(n_R \times n_S / \max(V(A,R), V(A,S))\)</span> can yield a result that is <em>larger</em> than either input. This happens when <span class="math inline">\(A\)</span> is frequent in both relations.</p>
+<p><strong>Example</strong>: <span class="math inline">\(n_R = 10000\)</span>, <span class="math inline">\(n_S = 5000\)</span>, <span class="math inline">\(V(A, R) = V(A, S) = 100\)</span>. Estimate: <span class="math inline">\(10000 \times 5000 / 100 = 500000\)</span>.</p>
+<p>Starting from 15,000 total input tuples, we estimate 500,000 output tuples — a 33× expansion. This is because each of the 100 distinct values of <span class="math inline">\(A\)</span> appears on average 100 times in R and 50 times in S, so each value contributes <span class="math inline">\(100 \times 50 = 5000\)</span> join tuples, and across 100 values we get 500,000 total.</p>
+<p>Such joins are not common in well-designed databases (they usually indicate a missing primary key constraint or an unusual many-to-many relationship), but they do occur. The optimizer must be aware that join results can be far larger than inputs — this affects the ordering of joins in a multi-way join.</p>
+</section>
+<section id="incorporating-selections" class="level3">
+<h3 class="anchored" data-anchor-id="incorporating-selections">2.5 Incorporating Selections</h3>
+<p>If there is a selection predicate on one of the join inputs — say, a condition on <span class="math inline">\(S\)</span> with selectivity <span class="math inline">\(f\)</span> (fraction of S tuples satisfying the condition) — the adjusted estimate simply multiplies:</p>
+<p><span class="math display">\[|(\sigma_\theta(S)) \bowtie R| \approx f \times |S \bowtie R|\]</span></p>
+<p>This assumes the selection predicate is <strong>independent</strong> of the join attribute, which is not always true but is the standard assumption. In practice, correlation between attributes (e.g., <code>dept_name</code> and <code>salary</code> in an employee table) can cause this estimate to be off significantly, but handling arbitrary correlations requires multi-dimensional statistics that are expensive to maintain.</p>
+<hr>
+</section>
+</section>
+<section id="the-full-optimization-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="the-full-optimization-pipeline">3. The Full Optimization Pipeline</h2>
+<p>With selectivity estimation and join size estimation both in hand, the optimizer can estimate the cost of any plan tree bottom-up: start with the base relation sizes, propagate sizes through each operator using the formulas above, and use the operator cost formulas from earlier notes (hash join = O(<span class="math inline">\(b_R + b_S\)</span>), sort-merge join = O(<span class="math inline">\(b_R + b_S\)</span>), etc.) to compute total cost.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-092.png" class="img-fluid figure-img"></p>
+<figcaption>Query Optimization Steps</figcaption>
+</figure>
+</div>
+<p>The three main steps of query optimization are: 1. <strong>Generate equivalent expressions</strong> — using equivalence rules (covered in the previous notes) 2. <strong>Estimate cost for each plan</strong> — using statistics and the formulas above 3. <strong>Choose the best plan</strong> — using an efficient search algorithm</p>
+<p>The challenge is that generating <em>all</em> equivalent expressions is infeasible for non-trivial queries. Steps 1 and 3 must be done together, with cost estimation used to prune the search. We now discuss the search algorithms.</p>
+<hr>
+</section>
+<section id="the-search-problem" class="level2">
+<h2 class="anchored" data-anchor-id="the-search-problem">4. The Search Problem</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-093.png" class="img-fluid figure-img"></p>
+<figcaption>Optimization Algorithms: Overview</figcaption>
+</figure>
+</div>
+<p>For a query joining <span class="math inline">\(n\)</span> relations, the number of distinct join orderings (ignoring operator choice) is at least <span class="math inline">\(n!\)</span>. For <span class="math inline">\(n = 7\)</span> that is 5,040; for <span class="math inline">\(n = 10\)</span> it exceeds 3.6 million. And this counts only join orderings — for each ordering, we also choose between hash join, sort-merge join, and nested loops join, and decide whether to apply selections before or after each join.</p>
+<p>The total plan space is enormous. Early databases simply did not have a proper optimizer and used hand-coded heuristics. MongoDB and Apache Spark both operated without a full cost-based optimizer for the first 8–10 years of their existence. Oracle famously used heuristics-only optimization from its founding in the mid-1980s until it switched to a proper cost-based optimizer in the late 1990s.</p>
+<p>Today, all mature relational databases use a combination of heuristic pruning and cost-based dynamic programming.</p>
+<hr>
+</section>
+<section id="heuristic-optimization" class="level2">
+<h2 class="anchored" data-anchor-id="heuristic-optimization">5. Heuristic Optimization</h2>
+<p>The simplest approach: apply a fixed set of rewrite rules as mandatory transformations, without considering cost. Common heuristics:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-099.png" class="img-fluid figure-img"></p>
+<figcaption>Heuristic Optimization</figcaption>
+</figure>
+</div>
+<ol type="1">
+<li><p><strong>Apply selections as early as possible.</strong> Push selection predicates as far down the plan tree as allowed by the equivalence rules. This reduces the number of tuples processed by all operators above the selection, and is almost always beneficial.</p></li>
+<li><p><strong>Apply projections as early as possible.</strong> Drop attributes not needed by later operators. This reduces tuple width and thus the amount of data processed.</p></li>
+<li><p><strong>Do the most restrictive operation first.</strong> Among a sequence of joins, estimate which join produces the fewest output tuples and do it first. The intuition: if one join eliminates most rows early, subsequent joins operate on much smaller inputs.</p></li>
+</ol>
+<p>These rules do not guarantee an optimal plan. The selection-first rule, as discussed in the previous notes, can actually hurt performance when the best plan involves an index nested loops join on the unfiltered relation. The “most restrictive first” rule for joins turns out to be a poor heuristic in many cases — it ignores the cost of producing the intermediate result.</p>
+<p>Despite their limitations, heuristics remain valuable for large <span class="math inline">\(n\)</span> where cost-based search becomes expensive, and most production optimizers apply some heuristic pruning before running the cost-based search.</p>
+<hr>
+</section>
+<section id="cost-based-search-dynamic-programming" class="level2">
+<h2 class="anchored" data-anchor-id="cost-based-search-dynamic-programming">6. Cost-Based Search: Dynamic Programming</h2>
+<p>The standard algorithm for cost-based join ordering is <strong>dynamic programming</strong>, first published by Selinger et al.&nbsp;at IBM in 1979 in the context of System R — one of the most influential papers in database systems history. It remains the foundation of most production optimizers today.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-094.png" class="img-fluid figure-img"></p>
+<figcaption>Searching for the Best Plan — Complexity</figcaption>
+</figure>
+</div>
+<section id="the-key-insight-optimal-substructure" class="level3">
+<h3 class="anchored" data-anchor-id="the-key-insight-optimal-substructure">6.1 The Key Insight: Optimal Substructure</h3>
+<p>The reason dynamic programming works here is that the join cost function has <strong>optimal substructure</strong>: the best plan for joining <span class="math inline">\(\{R_1, R_2, R_3, R_4, R_5\}\)</span> can be built from the best plan for joining some subset <span class="math inline">\(\{R_1, R_2, R_3, R_4\}\)</span> combined with <span class="math inline">\(R_5\)</span>. We do not need to reconsider the internal structure of the sub-plan for <span class="math inline">\(\{R_1, R_2, R_3, R_4\}\)</span> — we just use its precomputed cost and estimated output size.</p>
+<p>This is the same principle behind classical DP algorithms for problems like shortest paths or optimal binary search trees.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-095.png" class="img-fluid figure-img"></p>
+<figcaption>Dynamic Programming Algorithm</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-algorithm" class="level3">
+<h3 class="anchored" data-anchor-id="the-algorithm">6.2 The Algorithm</h3>
+<p>Build up the optimal plan bottom-up, one join at a time:</p>
+<p><strong>Level 1 — Single relations</strong>: the “best plan” for each base relation <span class="math inline">\(R_i\)</span> is trivially a scan (sequential or index). Record the estimated output size of each.</p>
+<p><strong>Level 2 — Pairwise joins</strong>: for every pair <span class="math inline">\((R_i, R_j)\)</span>, compute the best way to join them: consider hash join, sort-merge join, and nested loops join; pick the cheapest. Record the cost and estimated output size of <span class="math inline">\(R_i \bowtie R_j\)</span>.</p>
+<p><strong>Level 3 — Three-way joins</strong>: for every subset <span class="math inline">\(\{R_i, R_j, R_k\}\)</span> of size 3, consider all ways to split it into a two-way subproblem plus one more relation: - <span class="math inline">\((R_i \bowtie R_j) \bowtie R_k\)</span>: use the precomputed cost of <span class="math inline">\(R_i \bowtie R_j\)</span> plus the cost of joining its output with <span class="math inline">\(R_k\)</span> - <span class="math inline">\((R_i \bowtie R_k) \bowtie R_j\)</span>: similarly - <span class="math inline">\((R_j \bowtie R_k) \bowtie R_i\)</span>: similarly</p>
+<p>For each grouping, consider all join algorithms. Keep only the cheapest. The precomputed costs and sizes from Level 2 are reused directly.</p>
+<p><strong>Level <span class="math inline">\(k\)</span></strong>: continue until reaching Level <span class="math inline">\(n\)</span> — the full <span class="math inline">\(n\)</span>-way join.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-096.png" class="img-fluid figure-img"></p>
+<figcaption>Dynamic Programming: Worked Example</figcaption>
+</figure>
+</div>
+<p><strong>Worked example</strong> (5 relations, from the lecture): At Level 2, the optimizer finds: - Best way to join <span class="math inline">\(R_1, R_2\)</span>: hash join, cost 100 - Best way to join <span class="math inline">\(R_1, R_3\)</span>: sort-merge join, cost 300 - Best way to join <span class="math inline">\(R_4, R_5\)</span>: hash join, cost 300 - … (all <span class="math inline">\(\binom{5}{2} = 10\)</span> pairs)</p>
+<p>At Level 3, to find the best plan for <span class="math inline">\(\{R_1, R_2, R_3\}\)</span>: - Option A: <span class="math inline">\((R_1 \bowtie R_2) \bowtie R_3\)</span> = 100 (R1,R2 cost) + cost of joining their output with R3 - Option B: <span class="math inline">\((R_1 \bowtie R_3) \bowtie R_2\)</span> = 300 + cost of joining output with R2 - Option C: <span class="math inline">\((R_2 \bowtie R_3) \bowtie R_1\)</span> = precomputed cost of R2,R3 + cost with R1</p>
+<p>The DP does not reopen the question of how to join <span class="math inline">\(R_1\)</span> and <span class="math inline">\(R_2\)</span> internally; it trusts the Level 2 answer.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-097.png" class="img-fluid figure-img"></p>
+<figcaption>Dynamic Programming: Continued</figcaption>
+</figure>
+</div>
+</section>
+<section id="complexity" class="level3">
+<h3 class="anchored" data-anchor-id="complexity">6.3 Complexity</h3>
+<p>The number of subsets of <span class="math inline">\(n\)</span> relations is <span class="math inline">\(2^n\)</span>. For each subset of size <span class="math inline">\(k\)</span>, we consider <span class="math inline">\(k\)</span> ways to add the last relation, and for each we try a constant number of join algorithms. Total work: <span class="math inline">\(O(n^2 \cdot 2^n)\)</span>. This is still exponential, but exponential in <span class="math inline">\(n\)</span> rather than the super-exponential <span class="math inline">\(n!\)</span> of exhaustive enumeration.</p>
+<p>For <span class="math inline">\(n \leq 10\)</span>, this is fast in practice. For <span class="math inline">\(n &gt; 10\)</span>, most optimizers fall back to heuristics or restrict the plan space.</p>
+</section>
+<section id="left-deep-vs-bushy-plans" class="level3">
+<h3 class="anchored" data-anchor-id="left-deep-vs-bushy-plans">6.4 Left-Deep vs Bushy Plans</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-098.png" class="img-fluid figure-img"></p>
+<figcaption>Left-Deep Join Trees</figcaption>
+</figure>
+</div>
+<p>In a <strong>left-deep join tree</strong>, every join has a base relation as its right input — intermediate results only appear on the left. In a <strong>bushy plan</strong>, intermediate results can appear on both sides of a join.</p>
+<p>Left-deep plans are simpler and dominate in practice for two reasons: 1. They are easier to pipeline: the right (probe) input to each join is a base relation that can be scanned from disk, while the left (build) input flows directly from the previous join operator. 2. Early systems only considered left-deep plans to keep the optimizer tractable.</p>
+<p>Many modern optimizers still restrict their search to left-deep plans, especially for large <span class="math inline">\(n\)</span>. The number of left-deep orderings is <span class="math inline">\(n!\)</span> — still large, but the DP algorithm restricts this further by only considering orderings consistent with the join graph (relations that share no join condition need not be joined first).</p>
+<hr>
+</section>
+</section>
+<section id="practical-considerations" class="level2">
+<h2 class="anchored" data-anchor-id="practical-considerations">7. Practical Considerations</h2>
+<p><strong>Combining DP with heuristics.</strong> Most production optimizers apply heuristics first — push down selections, eliminate cross products by respecting the join graph, drop obviously dominated plans — and then run DP on the reduced plan space. This makes optimization tractable for queries with 20+ joins.</p>
+<p><strong>Interesting orders.</strong> A plan whose output is sorted on a useful attribute (e.g., the join attribute used by the next join, or an ORDER BY attribute) may be worth keeping even if it is slightly more expensive, because it can eliminate a sort operator later. This complicates the DP slightly but the principle is the same.</p>
+<p><strong>The limits of statistics.</strong> All of the cost estimates depend on the accuracy of the underlying statistics. As we saw in the previous notes, unusual predicates can produce estimates off by an order of magnitude. When that happens, even a perfect search algorithm chooses a bad plan. This is why <strong>statistics maintenance</strong> (timely <code>VACUUM ANALYZE</code> in PostgreSQL, or its equivalent) is as important as the optimizer algorithm itself.</p>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">8. Summary</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-100.png" class="img-fluid figure-img"></p>
+<figcaption>Query Optimization Summary</figcaption>
+</figure>
+</div>
+<p>Query optimization brings together three components:</p>
+<ol type="1">
+<li><strong>Equivalence rules</strong> (previous notes): determine which plan transformations are valid</li>
+<li><strong>Cost and size estimation</strong> (this and previous notes): estimate how expensive each plan will be
+<ul>
+<li>Single-table selectivity: V(A,r) for equality, MAX/MIN for ranges, MCVs for skew, histograms for range refinement</li>
+<li>Join sizes: <span class="math inline">\(n_R \times n_S / \max(V(A,R), V(A,S))\)</span>, with special cases for primary key joins</li>
+</ul></li>
+<li><strong>Search algorithms</strong> (this section): find a good plan efficiently
+<ul>
+<li>Heuristics: selection/projection pushdown, restrictive-first ordering — simple, fast, not optimal</li>
+<li>Dynamic programming (Selinger et al.&nbsp;1979): bottom-up, <span class="math inline">\(O(n^2 \cdot 2^n)\)</span>, optimal within the plan space considered</li>
+</ul></li>
+</ol>
+<p>Query optimization is one of the most complex components in a database system and remains an active research area. Systems like MongoDB and early Apache Spark shipped without full cost-based optimizers for years; both eventually added them. The largest vendors (Oracle, IBM DB2, SQL Server, PostgreSQL) continue to invest heavily in improving their optimizers, particularly in statistics estimation and handling of complex SQL features.</p>
+<p>The next module covers <strong>parallel and distributed query processing</strong> — how these same operations are executed across multiple machines in systems like Apache Spark and Amazon Redshift.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Query Processing — Equivalence of Relational Expressions – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">1. Introduction</a></li>
+  <li><a href="#what-equivalence-means" id="toc-what-equivalence-means" class="nav-link" data-scroll-target="#what-equivalence-means">2. What Equivalence Means</a></li>
+  <li><a href="#equivalence-rules-for-selections" id="toc-equivalence-rules-for-selections" class="nav-link" data-scroll-target="#equivalence-rules-for-selections">3. Equivalence Rules for Selections</a></li>
+  <li><a href="#equivalence-rules-for-projections-and-joins" id="toc-equivalence-rules-for-projections-and-joins" class="nav-link" data-scroll-target="#equivalence-rules-for-projections-and-joins">4. Equivalence Rules for Projections and Joins</a></li>
+  <li><a href="#selection-pushdown" id="toc-selection-pushdown" class="nav-link" data-scroll-target="#selection-pushdown">5. Selection Pushdown</a></li>
+  <li><a href="#outer-joins-commutativity-but-not-associativity" id="toc-outer-joins-commutativity-but-not-associativity" class="nav-link" data-scroll-target="#outer-joins-commutativity-but-not-associativity">6. Outer Joins: Commutativity But Not Associativity</a></li>
+  <li><a href="#rules-for-set-operations" id="toc-rules-for-set-operations" class="nav-link" data-scroll-target="#rules-for-set-operations">7. Rules for Set Operations</a></li>
+  <li><a href="#generating-equivalent-plans-and-why-full-enumeration-is-infeasible" id="toc-generating-equivalent-plans-and-why-full-enumeration-is-infeasible" class="nav-link" data-scroll-target="#generating-equivalent-plans-and-why-full-enumeration-is-infeasible">8. Generating Equivalent Plans — and Why Full Enumeration is Infeasible</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">9. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Query Processing — Equivalence of Relational Expressions</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">1. Introduction</h2>
+<p>The query optimizer’s job is to find the best physical plan for a given SQL query. But before asking “which plan is cheapest?”, it must answer a more fundamental question: <strong>when are two query plans equivalent?</strong> That is, do they produce the same result on every possible database instance?</p>
+<p>This matters because the optimizer transforms the plan the parser hands it into a better one. If that transformation is incorrect — if the rewritten plan produces different results — the database is silently returning wrong answers, which is far worse than returning correct answers slowly. Equivalence must hold not just for the current database state, but for <em>all</em> legal database instances (instances that satisfy the declared constraints: primary keys, foreign keys, etc.), because the database will change as rows are inserted and deleted.</p>
+<p>The optimizer reasons about equivalence using a collection of <strong>algebraic rewrite rules</strong> — transformations on the operator tree that are guaranteed to preserve the query’s meaning. A real optimizer may have hundreds of such rules. Applying them to an initial plan generates a space of equivalent alternatives, from which the optimizer picks the cheapest.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-068.png" class="img-fluid figure-img"></p>
+<figcaption>Equivalence of Expressions</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="what-equivalence-means" class="level2">
+<h2 class="anchored" data-anchor-id="what-equivalence-means">2. What Equivalence Means</h2>
+<p>Two relational expressions are <strong>equivalent</strong> if, for every legal database instance, they produce the same set of result tuples (same tuples, same multiplicities). Two plans can look completely different structurally — one might apply a selection before a join, the other after — and still be equivalent.</p>
+<p>For example, consider:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> instructor i <span class="kw">JOIN</span> teaches t <span class="kw">ON</span> i.<span class="kw">id</span> <span class="op">=</span> t.<span class="kw">id</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> i.dept_name <span class="op">=</span> <span class="st">'Music'</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The parser might produce a plan that joins first, then filters. The optimizer might want to filter <code>instructor</code> first, then join. Are these equivalent? For an inner join on <code>i.id = t.id</code> with the predicate only involving <code>instructor</code> attributes, yes — we can prove it holds for all databases. The optimizer can safely use the faster plan.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-069.png" class="img-fluid figure-img"></p>
+<figcaption>Equivalence: Definition and First Rules</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="equivalence-rules-for-selections" class="level2">
+<h2 class="anchored" data-anchor-id="equivalence-rules-for-selections">3. Equivalence Rules for Selections</h2>
+<p><strong>Rule 1 — Conjunctive selection decomposition:</strong> <span class="math display">\[\sigma_{\theta_1 \wedge \theta_2}(E) \equiv \sigma_{\theta_1}(\sigma_{\theta_2}(E))\]</span></p>
+<p>A single selection with an AND predicate can be split into two nested selections. This matters because it allows individual sub-predicates to be pushed to different parts of the plan tree, and it enables matching individual sub-predicates against available indexes. For example, if there is an index on attribute B but not A, splitting <code>WHERE A=20 AND B=30</code> into two separate selections allows the optimizer to use the index for the B predicate.</p>
+<p>Note that this rule does <strong>not</strong> apply to OR predicates: <span class="math display">\[\sigma_{\theta_1 \vee \theta_2}(E) \not\equiv \sigma_{\theta_1}(E) \cup \sigma_{\theta_2}(E)\]</span> …at least not in SQL, because SQL preserves duplicates. A tuple satisfying both θ₁ and θ₂ would appear once in the left expression but potentially twice in the union on the right. Under relational algebra (pure sets, no duplicates) the rule holds, but SQL’s multiset semantics break it.</p>
+<p><strong>Rule 2 — Commutativity of selection:</strong> <span class="math display">\[\sigma_{\theta_1}(\sigma_{\theta_2}(E)) \equiv \sigma_{\theta_2}(\sigma_{\theta_1}(E))\]</span></p>
+<p>The order of selections does not matter. Combined with Rule 1, this gives the optimizer full freedom to reorder and redistribute filter conditions.</p>
+<hr>
+</section>
+<section id="equivalence-rules-for-projections-and-joins" class="level2">
+<h2 class="anchored" data-anchor-id="equivalence-rules-for-projections-and-joins">4. Equivalence Rules for Projections and Joins</h2>
+<p><strong>Rule 3 — Projection collapsing:</strong></p>
+<p>If we apply a sequence of projections, only the outermost (narrowest) one matters — intermediate projections on wider attribute sets are redundant: <span class="math display">\[\Pi_{L_1}(\Pi_{L_2}(\cdots \Pi_{L_n}(E)\cdots)) \equiv \Pi_{L_1}(E)\]</span> (provided <span class="math inline">\(L_1 \subseteq L_2 \subseteq \cdots\)</span>, so that <span class="math inline">\(L_1\)</span> refers only to attributes that exist in E). This allows the optimizer to eliminate unnecessary intermediate projections.</p>
+<p><strong>Rule 4 — Commutativity of join:</strong> <span class="math display">\[E_1 \bowtie_\theta E_2 \equiv E_2 \bowtie_\theta E_1\]</span></p>
+<p>Join is symmetric. Swapping left and right inputs does not change the result. In physical execution, this determines which relation is the build side vs the probe side in a hash join, or which is the outer loop in a nested loops join.</p>
+<p><strong>Rule 5 — Associativity of (inner) join:</strong> <span class="math display">\[(E_1 \bowtie E_2) \bowtie E_3 \equiv E_1 \bowtie (E_2 \bowtie E_3)\]</span></p>
+<p>Joins can be regrouped freely. For a query joining relations R, S, and T, the optimizer can choose to join R⋈S first or S⋈T first. This is the primary source of the join ordering problem — the number of valid groupings grows factorially with the number of relations.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-070.png" class="img-fluid figure-img"></p>
+<figcaption>More Equivalence Rules</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="selection-pushdown" class="level2">
+<h2 class="anchored" data-anchor-id="selection-pushdown">5. Selection Pushdown</h2>
+<p><strong>Rule 6 — Selection pushdown through join:</strong> <span class="math display">\[\sigma_{\theta_0}(E_1 \bowtie_\theta E_2) \equiv (\sigma_{\theta_0}(E_1)) \bowtie_\theta E_2 \quad \text{if } \theta_0 \text{ involves only attributes of } E_1\]</span></p>
+<p>If a filter predicate references only one side of a join, it can be applied <em>before</em> the join. This is one of the most important transformations in practice: applying selections early reduces the size of join inputs, which reduces the cost of the join itself.</p>
+<p>For example, if E₁ is the <code>instructor</code> relation with 100,000 rows and only 50 music instructors, applying <code>dept_name = 'Music'</code> before the join reduces the join’s left input by a factor of 2,000. The join produces a much smaller intermediate result.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-071.png" class="img-fluid figure-img"></p>
+<figcaption>Pictorial Depiction of Equivalence Rules</figcaption>
+</figure>
+</div>
+<p><strong>When not to push down.</strong> Selection pushdown is a heuristic that is usually correct but not always beneficial. Consider a case where E₁ (the relation being filtered) is very large, but there is a B+-tree index on E₁’s join attribute B, and E₂ is a small relation (say, one tuple). In this scenario, the best plan is an <strong>index nested loops join</strong>: take the single tuple from E₂, look up the matching rows in E₁ using the index on B, then apply the filter θ₀ to the results.</p>
+<p>But if we push θ₀ down first, we may eliminate the possibility of using E₁’s index for the join — the query plan no longer looks like an index lookup. The result could be a hash join on a filtered E₁, which is actually more expensive than the index join in this case.</p>
+<p>This is why good optimizers do not blindly apply selection pushdown as a mandatory rewrite. They consider both plans — with and without pushdown — and use cost estimation to choose. This is also why pure heuristic-based optimizers can be fragile.</p>
+<hr>
+</section>
+<section id="outer-joins-commutativity-but-not-associativity" class="level2">
+<h2 class="anchored" data-anchor-id="outer-joins-commutativity-but-not-associativity">6. Outer Joins: Commutativity But Not Associativity</h2>
+<p>Outer joins are more restricted than inner joins. They are commutative in the sense that swapping inputs converts a left outer join to a right outer join: <span class="math display">\[E_1 \text{ LEFT OUTER JOIN } E_2 \equiv E_2 \text{ RIGHT OUTER JOIN } E_1\]</span></p>
+<p>However, outer joins are <strong>not associative</strong>, and <strong>selection cannot be freely pushed through an outer join</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-073.png" class="img-fluid figure-img"></p>
+<figcaption>Outer Join Rules</figcaption>
+</figure>
+</div>
+<p><strong>Why selection pushdown fails with outer joins.</strong> Consider <code>R FULL OUTER JOIN S</code> with a filter <code>A = 10</code> on attribute A from R. The two expressions: 1. <code>σ_{A=10}(R FULL OUTER JOIN S)</code> 2. <code>(σ_{A=10}(R)) FULL OUTER JOIN S</code></p>
+<p>are <strong>not equivalent</strong>. A concrete counterexample: suppose R has one tuple (A=20, B=5) and S has one tuple (B=5, C=30). In expression 1, the join produces (20, 5, 30) — which is then filtered out by A=10, leaving only (NULL, 5, 30) from the right outer join part. Wait — actually the full outer join would produce (20, 5, 30) and since there’s a match, no nulls arise, but then the filter removes it. The result is empty.</p>
+<p>In expression 2, filtering R first removes the (A=20) tuple, leaving R empty. The full outer join of empty R with S then produces (NULL, 5, 30). The result has one row.</p>
+<p>The two expressions produce different results. Selection cannot be pushed through the right side of an outer join, because the outer join specifically exists to surface non-matching tuples — and filtering before the join eliminates tuples that the outer join would have preserved (with NULLs).</p>
+<p>The left side is actually fine: pushing a filter that references only the left relation of a LEFT OUTER JOIN works correctly. It is the right side and full outer join that break down. This is the same phenomenon as the SQL query behavior difference between putting a filter in the ON clause versus in a WHERE clause for outer joins — a topic some of you encountered in the assignments.</p>
+<p><strong>Why outer joins are not associative.</strong> A similar argument applies to join associativity. NULLs introduced by one outer join can change whether a subsequent outer join finds a match, depending on the grouping. The slides contain a worked example.</p>
+<hr>
+</section>
+<section id="rules-for-set-operations" class="level2">
+<h2 class="anchored" data-anchor-id="rules-for-set-operations">7. Rules for Set Operations</h2>
+<p>Union and intersection are commutative and associative: <span class="math inline">\(E_1 \cup E_2 \equiv E_2 \cup E_1\)</span>, and similarly for <span class="math inline">\(\cap\)</span>. Set difference is <strong>not</strong> commutative: <span class="math inline">\(E_1 - E_2 \not\equiv E_2 - E_1\)</span>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-072.png" class="img-fluid figure-img"></p>
+<figcaption>Equivalence Rules for Set Operations</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="generating-equivalent-plans-and-why-full-enumeration-is-infeasible" class="level2">
+<h2 class="anchored" data-anchor-id="generating-equivalent-plans-and-why-full-enumeration-is-infeasible">8. Generating Equivalent Plans — and Why Full Enumeration is Infeasible</h2>
+<p>Equipped with equivalence rules, an optimizer could enumerate all plans equivalent to the input by repeatedly applying every applicable rule until no new plans emerge:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-074.png" class="img-fluid figure-img"></p>
+<figcaption>Generating Equivalent Expressions</figcaption>
+</figure>
+</div>
+<p>The problem is scale. With <span class="math inline">\(n\)</span> relations to join, commutativity and associativity alone generate between <span class="math inline">\(n! \cdot 2^n\)</span> and <span class="math inline">\(n^2 \cdot 2^n\)</span> plans at the extreme. For <span class="math inline">\(n = 10\)</span>, 10! exceeds 3.6 million. Adding operator choice (hash join vs sort-merge join vs index join) multiplies this further.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-075.png" class="img-fluid figure-img"></p>
+<figcaption>Enumeration Complexity</figcaption>
+</figure>
+</div>
+<p>A real query can join 20, 50, or even 100 relations in data warehouse settings — full enumeration is completely infeasible. This is why practical optimizers never enumerate the full space. Instead, they apply equivalence rules <em>selectively</em>, guided by cost estimates, pruning the search space as they go. The specific search algorithms (dynamic programming, heuristics, left-deep plan restriction) will be covered when we discuss the optimization search phase.</p>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">9. Summary</h2>
+<p>Equivalence rules are the algebraic foundation of query optimization. The key rules:</p>
+<ul>
+<li><strong>Conjunctive selection decomposition</strong>: AND predicates can be split into nested selections, enabling index matching for individual sub-predicates</li>
+<li><strong>Selection commutativity</strong>: filter order doesn’t matter</li>
+<li><strong>Projection collapsing</strong>: intermediate projections are redundant</li>
+<li><strong>Join commutativity and associativity</strong>: the order and grouping of inner joins can be freely changed — this is the source of the join ordering problem</li>
+<li><strong>Selection pushdown</strong>: filters can be moved below joins when they reference only one join input, reducing intermediate result sizes; but this should not be done blindly when indexes are involved</li>
+<li><strong>Outer joins</strong>: commutative but not associative; selection cannot be pushed through the right side of an outer join</li>
+</ul>
+<p>The optimizer uses these rules to generate candidate plans. Because full enumeration is infeasible, it applies them selectively and uses cost estimation to prune the search. The next set of notes covers how costs and intermediate result sizes are estimated.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

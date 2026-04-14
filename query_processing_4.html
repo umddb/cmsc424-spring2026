@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Query Processing — Introduction to Query Optimization – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#why-query-optimization-matters" id="toc-why-query-optimization-matters" class="nav-link active" data-scroll-target="#why-query-optimization-matters">1. Why Query Optimization Matters</a></li>
+  <li><a href="#the-space-of-choices" id="toc-the-space-of-choices" class="nav-link" data-scroll-target="#the-space-of-choices">2. The Space of Choices</a></li>
+  <li><a href="#the-goal-avoiding-bad-plans" id="toc-the-goal-avoiding-bad-plans" class="nav-link" data-scroll-target="#the-goal-avoiding-bad-plans">3. The Goal: Avoiding Bad Plans</a></li>
+  <li><a href="#observing-query-plans-with-postgresql" id="toc-observing-query-plans-with-postgresql" class="nav-link" data-scroll-target="#observing-query-plans-with-postgresql">4. Observing Query Plans with PostgreSQL</a>
+  <ul class="collapse">
+  <li><a href="#explain-and-explain-analyze" id="toc-explain-and-explain-analyze" class="nav-link" data-scroll-target="#explain-and-explain-analyze">4.1 EXPLAIN and EXPLAIN ANALYZE</a></li>
+  <li><a href="#comparing-plans-index-scan-vs-sequential-scan" id="toc-comparing-plans-index-scan-vs-sequential-scan" class="nav-link" data-scroll-target="#comparing-plans-index-scan-vs-sequential-scan">4.2 Comparing Plans: Index Scan vs Sequential Scan</a></li>
+  <li><a href="#row-estimation-accuracy" id="toc-row-estimation-accuracy" class="nav-link" data-scroll-target="#row-estimation-accuracy">4.3 Row Estimation Accuracy</a></li>
+  </ul></li>
+  <li><a href="#using-postgresql-hints-to-force-query-plans" id="toc-using-postgresql-hints-to-force-query-plans" class="nav-link" data-scroll-target="#using-postgresql-hints-to-force-query-plans">5. Using PostgreSQL Hints to Force Query Plans</a>
+  <ul class="collapse">
+  <li><a href="#available-hint-parameters" id="toc-available-hint-parameters" class="nav-link" data-scroll-target="#available-hint-parameters">5.1 Available Hint Parameters</a></li>
+  <li><a href="#what-the-demo-revealed" id="toc-what-the-demo-revealed" class="nav-link" data-scroll-target="#what-the-demo-revealed">5.2 What the Demo Revealed</a></li>
+  <li><a href="#when-and-why-to-use-hints" id="toc-when-and-why-to-use-hints" class="nav-link" data-scroll-target="#when-and-why-to-use-hints">5.3 When and Why to Use Hints</a></li>
+  </ul></li>
+  <li><a href="#overview-of-query-optimization-steps" id="toc-overview-of-query-optimization-steps" class="nav-link" data-scroll-target="#overview-of-query-optimization-steps">6. Overview of Query Optimization Steps</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">7. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Query Processing — Introduction to Query Optimization</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="why-query-optimization-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-query-optimization-matters">1. Why Query Optimization Matters</h2>
+<p>In the previous three sets of notes, we covered how relational operators are implemented: sequential scans, index lookups, nested loops joins, hash joins, sort-merge joins, aggregation, and external memory algorithms. For each operation, we saw that there are multiple ways to implement it, and the performance differences between implementations can be dramatic.</p>
+<p>Query optimization is the problem of automatically choosing the best implementation for a given SQL query. The optimizer sits between the query parser and the query processor: it receives a logical query plan (a tree of relational operators) and produces an annotated physical plan specifying exactly which algorithm to use for each operator, which indexes to access, and in what order to perform join operations.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-062.png" class="img-fluid figure-img"></p>
+<figcaption>Query Processing Pipeline</figcaption>
+</figure>
+</div>
+<p><strong>Why does this matter?</strong> Consider a simple selection on a large table. A sequential scan might take tens of seconds. The same query answered through a B+-tree index might take a fraction of a millisecond — a speedup of several orders of magnitude. On a 1 GB relation, a sequential scan can take around 5 seconds; the same query with an appropriate index might run in under 40 milliseconds. Neither plan is wrong; both return the correct result. But one is over 100× faster.</p>
+<p>For joins, the differences are even more pronounced. A query joining three relations might take under 100 milliseconds with hash joins and the right join order, and nearly 20 seconds with nested loops joins in an unfavorable order — a factor of nearly 200. As queries become more complex and datasets grow larger, the optimizer’s ability to find a good plan becomes more and more critical.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-063.png" class="img-fluid figure-img"></p>
+<figcaption>Why Query Optimization Matters</figcaption>
+</figure>
+</div>
+<p>Query optimization is an active research area despite being studied for over 50 years. Major database vendors — Snowflake, Amazon Redshift, Oracle, and others — still invest significant engineering effort into their optimizers. SQL is complex, workloads evolve, and hardware changes (SSDs, large memories, many-core processors, distributed systems) all create new challenges for optimizer design.</p>
+<hr>
+</section>
+<section id="the-space-of-choices" class="level2">
+<h2 class="anchored" data-anchor-id="the-space-of-choices">2. The Space of Choices</h2>
+<p>Given a SQL query, the optimizer must make choices at multiple levels:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-064.png" class="img-fluid figure-img"></p>
+<figcaption>Query Optimization Choices</figcaption>
+</figure>
+</div>
+<p><strong>Whether to use an index</strong>: for a selection like <code>WHERE id = 579</code>, should the system use a B+-tree index on <code>id</code> or scan the entire table? The answer depends on how selective the predicate is and what indexes are available.</p>
+<p><strong>Which join algorithm to use</strong>: for a join between two relations, should the system use hash join, sort-merge join, index nested loops join, or plain nested loops join? Different algorithms have different memory requirements, I/O costs, and preconditions (e.g., index nested loops requires an existing index; hash join only works for equi-joins).</p>
+<p><strong>Join order</strong>: given a query joining relations R, S, and T, should the system join R and S first, then join the result with T? Or S and T first, then R? For a query with N relations, there are N! possible orderings — a number that grows explosively. For 10 relations, that is over 3.6 million orderings. In practice, databases handle queries joining 50 or even 100 tables, and the search space is enormous.</p>
+<p>This makes query optimization a <strong>combinatorial optimization problem</strong>, similar in flavor to the Traveling Salesman Problem. Like TSP, finding the provably optimal plan is computationally intractable in general, so real optimizers use heuristics and dynamic programming to find good (not necessarily optimal) plans efficiently.</p>
+<hr>
+</section>
+<section id="the-goal-avoiding-bad-plans" class="level2">
+<h2 class="anchored" data-anchor-id="the-goal-avoiding-bad-plans">3. The Goal: Avoiding Bad Plans</h2>
+<p>A common misconception is that the optimizer’s goal is to find the <em>best</em> plan. In practice, the goal is better described as <strong>avoiding catastrophically bad plans</strong>.</p>
+<p>The optimizer works with <em>estimates</em> of relation sizes, predicate selectivities, and operator costs — not exact figures. These estimates are based on statistics stored alongside the data (more on this below). Because the inputs to the optimizer are approximate, the plan it selects may not be the theoretically optimal plan for the actual data. What matters is that it avoids plans that are orders of magnitude worse than the best.</p>
+<p>In the examples we examined in class, the difference between the optimizer’s first choice (hash join, ~100ms) and the worst forced choice (nested loops join, ~19s) was nearly 200×. A good optimizer reliably finds a plan in the fast range; an optimizer that occasionally chose nested loops for this query would be a serious problem in production.</p>
+<p>The output of the optimizer is a fully annotated physical plan: not just which operators to use, but also their parameters — which hash function, how much memory to allocate, which index to use, and so on.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-065.png" class="img-fluid figure-img"></p>
+<figcaption>Query Optimization Goal</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="observing-query-plans-with-postgresql" class="level2">
+<h2 class="anchored" data-anchor-id="observing-query-plans-with-postgresql">4. Observing Query Plans with PostgreSQL</h2>
+<p>PostgreSQL provides excellent tools for inspecting the query plans it generates. Understanding these tools is essential for understanding why a query is running slowly and how to diagnose optimization issues.</p>
+<section id="explain-and-explain-analyze" class="level3">
+<h3 class="anchored" data-anchor-id="explain-and-explain-analyze">4.1 EXPLAIN and EXPLAIN ANALYZE</h3>
+<p>The <code>EXPLAIN</code> command shows the query plan that the optimizer chose, along with estimated costs and row counts. <code>EXPLAIN ANALYZE</code> additionally <em>executes</em> the query and shows actual row counts and execution times alongside the estimates. The format is:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">EXPLAIN</span> <span class="kw">ANALYZE</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> posts <span class="kw">WHERE</span> <span class="kw">id</span> <span class="op">=</span> <span class="dv">579</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A typical output looks like:</p>
+<pre><code>Index Scan using posts_pkey on posts  (cost=0.29..8.31 rows=1 width=...)
+                                      (actual time=0.05..0.06 rows=1 loops=1)
+  Index Cond: (id = 579)
+Planning Time: 0.4 ms
+Execution Time: 0.1 ms</code></pre>
+<p>Key fields to understand:</p>
+<ul>
+<li><strong>cost=X..Y</strong>: estimated cost in internal units. X is the startup cost (cost before first tuple is emitted) and Y is the total cost. These are <em>not</em> seconds — they are dimensionless relative units used to compare plans.</li>
+<li><strong>rows=N</strong>: estimated number of output rows, based on statistics.</li>
+<li><strong>actual time=X..Y</strong>: real wall-clock milliseconds (only with ANALYZE).</li>
+<li><strong>actual rows=N</strong>: actual number of rows produced during execution.</li>
+</ul>
+<p>The plan is presented as an indented tree, with the innermost (lowest-level) operators at the bottom. Reading from bottom to top gives you the data flow.</p>
+</section>
+<section id="comparing-plans-index-scan-vs-sequential-scan" class="level3">
+<h3 class="anchored" data-anchor-id="comparing-plans-index-scan-vs-sequential-scan">4.2 Comparing Plans: Index Scan vs Sequential Scan</h3>
+<p>Consider a simple lookup on the primary key of a <code>posts</code> table:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Query added by instructor</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> posts <span class="kw">WHERE</span> <span class="kw">id</span> <span class="op">=</span> <span class="dv">579</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The optimizer uses an index scan via the primary key B+-tree index. The execution time is under 0.2 ms. Now consider a range query with many matching rows:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Query added by instructor</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> posts <span class="kw">WHERE</span> last_editor_user_id <span class="kw">BETWEEN</span> <span class="dv">10</span> <span class="kw">AND</span> <span class="dv">1000</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>For a narrow range (returning ~224 rows), the optimizer uses the secondary index on <code>last_editor_user_id</code>. For a wider range (returning ~4,771 rows), it switches to a sequential scan. Why? With a secondary index, each matching tuple requires a random disk access to fetch from the heap. When the number of matching tuples is large enough, the cumulative cost of many random accesses exceeds the cost of a single sequential scan. The optimizer estimates the row count and crosses this threshold to decide.</p>
+<p>This illustrates a key principle: <strong>secondary indexes are only beneficial for selective predicates</strong>. For low-selectivity queries (many matching rows), sequential scan wins.</p>
+</section>
+<section id="row-estimation-accuracy" class="level3">
+<h3 class="anchored" data-anchor-id="row-estimation-accuracy">4.3 Row Estimation Accuracy</h3>
+<p>One of the most interesting aspects of <code>EXPLAIN ANALYZE</code> output is how close the estimated row counts are to actual row counts. For a join query like:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Query added by instructor</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> posts p <span class="kw">JOIN</span> comments c <span class="kw">ON</span> p.<span class="kw">id</span> <span class="op">=</span> c.post_id <span class="kw">JOIN</span> users u <span class="kw">ON</span> p.owner_user_id <span class="op">=</span> u.<span class="kw">id</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>PostgreSQL estimated 46,385 rows and got exactly 46,385. This level of accuracy is not accidental — it reflects careful statistics maintenance. PostgreSQL stores detailed histograms and column statistics for each relation, updated by the <code>VACUUM ANALYZE</code> command. For base relations, it knows the exact row count; for simple equi-join predicates on well-maintained statistics, the estimates can be very accurate.</p>
+<p>However, estimates degrade for unusual predicates. A query like:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Query added by instructor</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> posts <span class="kw">WHERE</span> last_editor_user_id % <span class="dv">10</span> <span class="op">=</span> <span class="dv">5</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Produced an estimate of ~129 rows when the actual count was ~1,032. The <code>%</code> (modulo) operator is unusual enough that PostgreSQL’s statistics model does not handle it well — it cannot apply the standard histogram approach. A reasonable heuristic would have been to guess 1/10 of the total rows (since <code>% 10</code> takes 10 equally likely values), but the optimizer did not make that inference. Inaccurate row estimates are one of the most common root causes of bad query plans.</p>
+<hr>
+</section>
+</section>
+<section id="using-postgresql-hints-to-force-query-plans" class="level2">
+<h2 class="anchored" data-anchor-id="using-postgresql-hints-to-force-query-plans">5. Using PostgreSQL Hints to Force Query Plans</h2>
+<p>PostgreSQL does not support explicit SQL hints in the way that Oracle or MySQL do (e.g., <code>/*+ USE_INDEX(...) */</code>). Instead, it provides <strong>run-time configuration parameters</strong> that enable or disable specific physical operators globally for the current session. These are the <code>enable_*</code> parameters, documented in the <a href="https://www.postgresql.org/docs/current/runtime-config-query.html#RUNTIME-CONFIG-QUERY-ENABLE">PostgreSQL manual on Query Planning</a>.</p>
+<section id="available-hint-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="available-hint-parameters">5.1 Available Hint Parameters</h3>
+<p>The key parameters for controlling join and scan methods are:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Default</th>
+<th>What it controls</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>enable_hashjoin</code></td>
+<td>on</td>
+<td>hash join operator</td>
+</tr>
+<tr class="even">
+<td><code>enable_mergejoin</code></td>
+<td>on</td>
+<td>sort-merge join operator</td>
+</tr>
+<tr class="odd">
+<td><code>enable_nestloop</code></td>
+<td>on</td>
+<td>nested loops join operator</td>
+</tr>
+<tr class="even">
+<td><code>enable_indexscan</code></td>
+<td>on</td>
+<td>B+-tree index scans</td>
+</tr>
+<tr class="odd">
+<td><code>enable_seqscan</code></td>
+<td>on</td>
+<td>sequential (full table) scans</td>
+</tr>
+<tr class="even">
+<td><code>enable_bitmapscan</code></td>
+<td>on</td>
+<td>bitmap index scans</td>
+</tr>
+<tr class="odd">
+<td><code>enable_indexonlyscan</code></td>
+<td>on</td>
+<td>index-only scans (covering indexes)</td>
+</tr>
+<tr class="even">
+<td><code>enable_sort</code></td>
+<td>on</td>
+<td>explicit sort operations</td>
+</tr>
+</tbody>
+</table>
+<p>Set them with <code>SET</code> for the current session:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> enable_hashjoin <span class="op">=</span> <span class="kw">off</span>;</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> enable_mergejoin <span class="op">=</span> <span class="kw">off</span>;</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> enable_nestloop <span class="op">=</span> <span class="kw">off</span>;   <span class="co">-- use with caution!</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Reset to default with:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">RESET</span> enable_hashjoin;</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- or</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> enable_hashjoin <span class="op">=</span> <span class="kw">on</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Important caveat</strong>: setting <code>enable_X = off</code> does not <em>prevent</em> PostgreSQL from using that operator — it raises its estimated cost to a very high value, making it extremely unlikely to be chosen. If all alternatives are disabled, PostgreSQL may still use a “disabled” operator rather than produce no plan at all. In the demo, disabling <code>enable_indexscan</code> caused PostgreSQL to choose a <code>Bitmap Index Scan</code> instead — an operator that internally uses an index but is classified differently.</p>
+</section>
+<section id="what-the-demo-revealed" class="level3">
+<h3 class="anchored" data-anchor-id="what-the-demo-revealed">5.2 What the Demo Revealed</h3>
+<p>In the live demo, we ran a three-table join and progressively disabled operators to observe the impact. The results illustrated the optimizer’s cost model directly:</p>
+<p><strong>All operators enabled</strong> (optimizer’s natural choice): hash joins throughout. Execution time: ~100ms. Optimizer’s estimated cost: ~2,000–4,000 internal units.</p>
+<p><strong>Hash join disabled</strong> (<code>SET enable_hashjoin = off</code>): PostgreSQL switched to index nested loops join (reported as “Nested Loop” in EXPLAIN but with index scans on the inner relation). Execution time: ~232ms. Optimizer’s estimated cost: ~5,000 units.</p>
+<p><strong>Hash join and index scan both disabled</strong>: PostgreSQL switched to sort-merge join. Execution time: ~109ms. Optimizer’s estimated cost: ~12,000 units. Interestingly, the <em>actual</em> execution time was better than index nested loops, even though the optimizer’s estimated cost was higher — illustrating that the cost model is not perfectly calibrated.</p>
+<p><strong>All three disabled, only nested loops available</strong>: execution time jumped to <strong>~19 seconds</strong> — nearly 200× slower than the hash join plan. The estimated cost was 75,000 units, accurately signaling that this was a bad plan. This is exactly the scenario the optimizer exists to prevent: it knew nested loops would be bad and avoided it when given the choice.</p>
+<p>The cost numbers (2,000, 5,000, 12,000, 75,000) are the optimizer’s internal estimates in abstract “cost units.” They do not translate directly to seconds or milliseconds — they are hardware-independent relative measures. The actual execution times depend on the specific machine, memory, and I/O subsystem. But the cost units are proportional to expected resource consumption and serve their purpose: they correctly rank the plans, with the exception of the sort-merge vs index nested loops case where the model was slightly off.</p>
+</section>
+<section id="when-and-why-to-use-hints" class="level3">
+<h3 class="anchored" data-anchor-id="when-and-why-to-use-hints">5.3 When and Why to Use Hints</h3>
+<p>Under normal circumstances, you should not need to use these parameters. PostgreSQL’s optimizer is generally good, and manually overriding it without understanding the statistics and cost model often makes things worse.</p>
+<p>The appropriate use cases for hints are:</p>
+<p><strong>Debugging</strong>: if a query is running unexpectedly slowly, compare the plan PostgreSQL chose with alternatives by disabling operators one at a time. The difference between estimated and actual rows in <code>EXPLAIN ANALYZE</code> output is the first thing to check — large discrepancies signal a statistics problem.</p>
+<p><strong>Known data characteristics</strong>: occasionally, you know something about your data that PostgreSQL does not capture in its statistics. For example, if you know that a particular value occurs far more often than the histogram suggests, you can force a different plan.</p>
+<p><strong>Statistics are stale</strong>: if <code>VACUUM ANALYZE</code> has not been run recently, statistics may be outdated. Fix the statistics first (run <code>ANALYZE tablename</code>); use hints as a last resort.</p>
+<p><strong>Testing and benchmarking</strong>: forcing specific plans, as we did in class, is useful for understanding the impact of different algorithms and validating your mental model of the optimizer.</p>
+<p>For more fine-grained control than the <code>enable_*</code> parameters provide, consider the <a href="https://github.com/ossc-db/pg_hint_plan"><code>pg_hint_plan</code></a> extension, which allows SQL-comment-style hints similar to Oracle. This extension is not included in standard PostgreSQL but is widely used in production environments.</p>
+<hr>
+</section>
+</section>
+<section id="overview-of-query-optimization-steps" class="level2">
+<h2 class="anchored" data-anchor-id="overview-of-query-optimization-steps">6. Overview of Query Optimization Steps</h2>
+<p>The remainder of the query optimization module will cover how the optimizer actually finds a good plan. At a high level, the process involves three steps:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-066.png" class="img-fluid figure-img"></p>
+<figcaption>Query Optimization Steps</figcaption>
+</figure>
+</div>
+<p><strong>Step 1 — Equivalence of expressions</strong>: before evaluating costs, determine which logical query plans produce the same result. For example, pushing a selection below a join (selecting before joining rather than after) reduces the size of intermediate results. Some rewrites are always valid; others are not (for instance, pushing a selection through an outer join can change the result). Understanding which transformations preserve equivalence is the foundation of the optimization process.</p>
+<p><strong>Step 2 — Estimating result sizes</strong>: for each operator in the plan, estimate how many tuples it will produce. This requires statistics about the underlying data (histograms, distinct value counts, correlation between columns). The accuracy of these estimates directly determines the quality of the final plan — as we saw in the demo, inaccurate estimates for the <code>% 10</code> predicate could have led to a bad plan.</p>
+<p><strong>Step 3 — Searching for the best plan</strong>: given the space of equivalent plans and a cost model for each, find the plan with the lowest estimated cost. Since exhaustive search over all possible plans is infeasible (the search space grows as N! for N relations), practical optimizers use dynamic programming, greedy heuristics, or a combination. The goal is to find a plan that is close to optimal in practice, not provably optimal in the theoretical sense.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="qp-jpegs/page-067.png" class="img-fluid figure-img"></p>
+<figcaption>Query Optimization Outline</figcaption>
+</figure>
+</div>
+<p>We will examine each of these steps in detail in the subsequent sets of notes, starting with equivalence of relational expressions.</p>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">7. Summary</h2>
+<p>Query optimization is the process of automatically selecting the best physical execution plan for a SQL query. The optimizer has a large search space — multiple implementation choices for each operator, multiple join orderings — and must navigate it efficiently.</p>
+<p>The key points from this lecture:</p>
+<ul>
+<li>The difference between a good and bad plan can easily be 2–3 orders of magnitude in execution time. Optimization is not a minor concern.</li>
+<li>PostgreSQL’s <code>EXPLAIN ANALYZE</code> is an essential tool for observing what plan the optimizer chose and how accurate its estimates were.</li>
+<li>PostgreSQL’s <code>enable_*</code> parameters (documented in the <a href="https://www.postgresql.org/docs/current/runtime-config-query.html#RUNTIME-CONFIG-QUERY-ENABLE">Query Planning section</a> of the manual) allow forcing or discouraging specific operators for debugging and experimentation.</li>
+<li>Row estimation accuracy is fundamental. Accurate statistics (maintained by <code>VACUUM ANALYZE</code>) underpin good optimization.</li>
+<li>The optimizer’s goal is not perfection — it is to reliably avoid catastrophically bad plans, since optimal plans cannot be guaranteed given that all inputs are estimates.</li>
+</ul>
+<p>The next set of notes will begin with the first step of optimization: equivalence rules for relational expressions and how they are used to generate the set of candidate plans.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
