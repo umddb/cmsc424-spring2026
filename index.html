@@ -121,6 +121,34 @@ ul.task-list li input[type="checkbox"] {
     <a class="dropdown-item" href="./query_processing_2.html">
  <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_3.html">
+ <span class="dropdown-text">Query Processing: Sort-Merge, Aggregation, External Memory</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_4.html">
+ <span class="dropdown-text">Query Processing: Intro to Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_5.html">
+ <span class="dropdown-text">Query Processing: Equivalence Rules</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_6.html">
+ <span class="dropdown-text">Query Processing: Cost Estimation and Statistics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_7.html">
+ <span class="dropdown-text">Query Processing: Join Size and Search Algorithms</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_8.html">
+ <span class="dropdown-text">Query Processing: Parallel and Distributed Architectures</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_9.html">
+ <span class="dropdown-text">Query Processing: Parallel Operator Execution</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item">
@@ -185,6 +213,13 @@ ul.task-list li input[type="checkbox"] {
 <ul>
 <li><a href="./query_processing_1.html">Query Plans, Pipelining, and Cost</a> — What a query plan is, logical vs physical operators, materialization vs pipelining, the iterator model (open/next/close), and how query cost is estimated.</li>
 <li><a href="./query_processing_2.html">Selection and Join Implementations</a> — Sequential scan and index-based selection, nested loops join, index nested loops join, hash join, and hash-based outer joins (left, right, full).</li>
+<li><a href="./query_processing_3.html">Sort-Merge Join, Aggregation, and External Memory</a> — Sort-merge join, group-by aggregation (hash-based and sort-based), duplicate elimination, set operations, and external memory algorithms (partitioned hash join and external sort-merge).</li>
+<li><a href="./query_processing_4.html">Introduction to Query Optimization</a> — Why optimization matters, reading EXPLAIN and EXPLAIN ANALYZE output in PostgreSQL, secondary index thresholds, and how to use PostgreSQL hint parameters to force specific query plans.</li>
+<li><a href="./query_processing_5.html">Equivalence of Relational Expressions</a> — Algebraic rewrite rules for selections, projections, and joins; selection pushdown (and when not to push); outer join restrictions; why full plan enumeration is infeasible.</li>
+<li><a href="./query_processing_6.html">Cost Estimation and Statistics</a> — Selectivity estimation for equality and range predicates, most common values, histograms (equi-width and equi-depth), and what PostgreSQL stores in pg_stats.</li>
+<li><a href="./query_processing_7.html">Join Size Estimation and Optimization Algorithms</a> — Join cardinality estimation (three cases), incorporating selections, heuristic optimization, and dynamic programming (Selinger algorithm).</li>
+<li><a href="./query_processing_8.html">Parallel and Distributed Architectures</a> — Shared-memory, shared-disk, and shared-nothing architectures; speedup and scaleup; Amdahl’s Law; hash and range partitioning; data replication; failure handling.</li>
+<li><a href="./query_processing_9.html">Parallel Execution of Relational Operators</a> — Parallel sort (range-partition shuffle), parallel hash join, fragment-and-replicate join, and parallel aggregation (three scenarios based on group count and aggregate decomposability).</li>
 </ul>
 
 
