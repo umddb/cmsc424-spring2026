@@ -149,6 +149,26 @@ ul.task-list li input[type="checkbox"] {
     <a class="dropdown-item" href="./query_processing_9.html">
  <span class="dropdown-text">Query Processing: Parallel Operator Execution</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_1.html">
+ <span class="dropdown-text">Transactions: ACID and Serializability</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_2.html">
+ <span class="dropdown-text">Transactions: Lock-Based Concurrency Control</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_3.html">
+ <span class="dropdown-text">Transactions: MVCC and Isolation Levels</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_4_5.html">
+ <span class="dropdown-text">Transactions: Recovery and Logging</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_6.html">
+ <span class="dropdown-text">Transactions: Distributed Transactions and 2PC</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item">
@@ -173,6 +193,7 @@ ul.task-list li input[type="checkbox"] {
   <ul>
   <li><a href="#storage-and-indexes" id="toc-storage-and-indexes" class="nav-link active" data-scroll-target="#storage-and-indexes">Storage and Indexes</a></li>
   <li><a href="#query-processing-and-optimization" id="toc-query-processing-and-optimization" class="nav-link" data-scroll-target="#query-processing-and-optimization">Query Processing and Optimization</a></li>
+  <li><a href="#transactions" id="toc-transactions" class="nav-link" data-scroll-target="#transactions">Transactions</a></li>
   </ul>
 </nav>
     </div>
@@ -220,6 +241,16 @@ ul.task-list li input[type="checkbox"] {
 <li><a href="./query_processing_7.html">Join Size Estimation and Optimization Algorithms</a> — Join cardinality estimation (three cases), incorporating selections, heuristic optimization, and dynamic programming (Selinger algorithm).</li>
 <li><a href="./query_processing_8.html">Parallel and Distributed Architectures</a> — Shared-memory, shared-disk, and shared-nothing architectures; speedup and scaleup; Amdahl’s Law; hash and range partitioning; data replication; failure handling.</li>
 <li><a href="./query_processing_9.html">Parallel Execution of Relational Operators</a> — Parallel sort (range-partition shuffle), parallel hash join, fragment-and-replicate join, and parallel aggregation (three scenarios based on group count and aggregate decomposability).</li>
+</ul>
+</section>
+<section id="transactions" class="level3">
+<h3 class="anchored" data-anchor-id="transactions">Transactions</h3>
+<ul>
+<li><a href="./transactions_1.html">ACID Properties and Serializability</a> — What transactions are, ACID guarantees, schedules, serial vs serializable schedules, the precedence graph test for serializability.</li>
+<li><a href="./transactions_2.html">Lock-Based Concurrency Control</a> — S/X locks, the lock manager, two-phase locking (2PL), strict 2PL, deadlock detection and prevention, multi-granularity locking with intention locks.</li>
+<li><a href="./transactions_3.html">MVCC and Isolation Levels</a> — Timestamp-based ordering, optimistic concurrency control (OCC), snapshot isolation, write skew, and SQL isolation levels.</li>
+<li><a href="./transactions_4_5.html">Recovery: Atomicity, Durability, and Logging</a> — Steal vs force policies, the memory/disk model, log-based recovery, write-ahead logging, UNDO with CLRs, REDO, the recovery algorithm, and checkpointing.</li>
+<li><a href="./transactions_6.html">Distributed Transactions and Two-Phase Commit</a> — Distributed databases, data replication, quorum systems, failure modes in distributed settings, two-phase commit protocol, recovery scenarios, and connections to Paxos and blockchain consensus.</li>
 </ul>
 
 

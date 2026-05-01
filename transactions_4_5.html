@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Transactions — Recovery: Atomicity, Durability, and Logging – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_3.html">
+ <span class="dropdown-text">Query Processing: Sort-Merge, Aggregation, External Memory</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_4.html">
+ <span class="dropdown-text">Query Processing: Intro to Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_5.html">
+ <span class="dropdown-text">Query Processing: Equivalence Rules</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_6.html">
+ <span class="dropdown-text">Query Processing: Cost Estimation and Statistics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_7.html">
+ <span class="dropdown-text">Query Processing: Join Size and Search Algorithms</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_8.html">
+ <span class="dropdown-text">Query Processing: Parallel and Distributed Architectures</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_9.html">
+ <span class="dropdown-text">Query Processing: Parallel Operator Execution</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_1.html">
+ <span class="dropdown-text">Transactions: ACID and Serializability</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_2.html">
+ <span class="dropdown-text">Transactions: Lock-Based Concurrency Control</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_3.html">
+ <span class="dropdown-text">Transactions: MVCC and Isolation Levels</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_4_5.html">
+ <span class="dropdown-text">Transactions: Recovery and Logging</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_6.html">
+ <span class="dropdown-text">Transactions: Distributed Transactions and 2PC</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#what-recovery-is-about" id="toc-what-recovery-is-about" class="nav-link active" data-scroll-target="#what-recovery-is-about">1. What Recovery Is About</a></li>
+  <li><a href="#the-types-of-failures" id="toc-the-types-of-failures" class="nav-link" data-scroll-target="#the-types-of-failures">2. The Types of Failures</a></li>
+  <li><a href="#the-memorydisk-model" id="toc-the-memorydisk-model" class="nav-link" data-scroll-target="#the-memorydisk-model">3. The Memory/Disk Model</a></li>
+  <li><a href="#steal-and-force" id="toc-steal-and-force" class="nav-link" data-scroll-target="#steal-and-force">4. Steal and Force</a></li>
+  <li><a href="#logs" id="toc-logs" class="nav-link" data-scroll-target="#logs">5. Logs</a></li>
+  <li><a href="#write-ahead-logging" id="toc-write-ahead-logging" class="nav-link" data-scroll-target="#write-ahead-logging">6. Write-Ahead Logging</a></li>
+  <li><a href="#using-logs-to-abort-transactions-undo" id="toc-using-logs-to-abort-transactions-undo" class="nav-link" data-scroll-target="#using-logs-to-abort-transactions-undo">7. Using Logs to Abort Transactions: UNDO</a></li>
+  <li><a href="#using-logs-after-a-crash-redo" id="toc-using-logs-after-a-crash-redo" class="nav-link" data-scroll-target="#using-logs-after-a-crash-redo">8. Using Logs After a Crash: REDO</a></li>
+  <li><a href="#the-recovery-algorithm" id="toc-the-recovery-algorithm" class="nav-link" data-scroll-target="#the-recovery-algorithm">9. The Recovery Algorithm</a></li>
+  <li><a href="#checkpointing" id="toc-checkpointing" class="nav-link" data-scroll-target="#checkpointing">10. Checkpointing</a></li>
+  <li><a href="#putting-it-together-undo-redo-and-the-stealforce-matrix" id="toc-putting-it-together-undo-redo-and-the-stealforce-matrix" class="nav-link" data-scroll-target="#putting-it-together-undo-redo-and-the-stealforce-matrix">11. Putting It Together: UNDO, REDO, and the Steal/Force Matrix</a></li>
+  <li><a href="#limitations-and-the-aries-system" id="toc-limitations-and-the-aries-system" class="nav-link" data-scroll-target="#limitations-and-the-aries-system">12. Limitations and the ARIES System</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">13. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Transactions — Recovery: Atomicity, Durability, and Logging</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="what-recovery-is-about" class="level2">
+<h2 class="anchored" data-anchor-id="what-recovery-is-about">1. What Recovery Is About</h2>
+<p>Recovery in a database system is the problem of guaranteeing two of the four ACID properties — <strong>Atomicity</strong> and <strong>Durability</strong> — in the presence of failures. Recall that atomicity requires a transaction to execute entirely or not at all, and durability requires that the effects of committed transactions survive any subsequent failure. These two guarantees are closely intertwined: the mechanisms that ensure one largely ensure the other, which is why they are typically addressed together.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-069.jpg" class="img-fluid figure-img"></p>
+<figcaption>Recovery Overview</figcaption>
+</figure>
+</div>
+<p>Isolation, the third DBMS-provided guarantee, interacts with recovery as well. In the discussion that follows, we assume that the system uses locking for concurrency control — specifically strict two-phase locking. This assumption simplifies the recovery argument and corresponds closely to what production systems do; we will see exactly why it is needed when we reach the undo algorithm.</p>
+<p>The motivating examples are familiar: a transaction that raises salaries for all instructors touches many rows across many disk blocks. If the system crashes after updating some rows but before others, the database is left in an inconsistent state that no serial execution of any transaction would produce. Similarly, deleting a course section requires deletes from <code>takes</code>, <code>teaches</code>, and <code>section</code> — three separate operations that must succeed or fail as a unit. Recovery is about ensuring that either all three happen or none of them do, even in the face of hardware crashes.</p>
+<hr>
+</section>
+<section id="the-types-of-failures" class="level2">
+<h2 class="anchored" data-anchor-id="the-types-of-failures">2. The Types of Failures</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-070.jpg" class="img-fluid figure-img"></p>
+<figcaption>Types of Failures</figcaption>
+</figure>
+</div>
+<p>Three categories of failure concern a database system.</p>
+<p><strong>Transaction failures</strong> occur when a transaction does not complete: the application may contain conditional logic that causes it to abort, or the database system may kill the transaction to resolve a deadlock. In either case, the transaction has performed some work that must be undone.</p>
+<p><strong>System crashes</strong> are the central concern. A power failure, operating system bug, or hardware fault can terminate the database process at any moment. Every transaction that was in progress at the time of the crash is left in an uncertain state: some of its updates may have reached disk, others may still be in memory and are now lost.</p>
+<p><strong>Disk failures</strong> — a head crash that destroys the platter, for example — are handled through replication and backup, not through the logging mechanisms we discuss here. For our purposes, we make a critical simplifying assumption: <strong>disk contents are not corrupted by a system crash and data on disk is not lost</strong>. This is not a real physical guarantee, but it corresponds to what production systems achieve through RAID, replication, and backup — they ensure that a disk the system can read is correct. Given this assumption, disk is our only truly permanent storage: anything written to disk before a crash is still there when the system comes back up.</p>
+<hr>
+</section>
+<section id="the-memorydisk-model" class="level2">
+<h2 class="anchored" data-anchor-id="the-memorydisk-model">3. The Memory/Disk Model</h2>
+<p>To reason about recovery, we need a precise model of where data lives and how it moves.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-073.jpg" class="img-fluid figure-img"></p>
+<figcaption>Memory and Disk Architecture</figcaption>
+</figure>
+</div>
+<p><strong>Physical blocks</strong> reside on disk. <strong>Buffer blocks</strong> are copies of physical blocks held in the memory buffer pool, which is shared among all transactions and queries and is managed by the buffer manager. Each transaction also has its own <strong>private work area</strong> — like the memory of a process — where it holds local copies of the specific data items it is currently manipulating.</p>
+<p>Two special operations govern data movement between disk and memory:</p>
+<ul>
+<li><code>input(B)</code>: copy physical block <span class="math inline">\(B\)</span> from disk into a buffer block</li>
+<li><code>output(B)</code>: copy buffer block <span class="math inline">\(B\)</span> to the corresponding physical block on disk</li>
+</ul>
+<p>These are the only mechanisms for getting data to and from disk; the unit of transfer is always a full block. Even if a transaction needs only a single byte from a block, the entire block must be brought into the buffer pool first.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-075.jpg" class="img-fluid figure-img"></p>
+<figcaption>Transaction Work Areas</figcaption>
+</figure>
+</div>
+<p>Within this model, the <code>read(X)</code> and <code>write(X)</code> operations that transactions issue are not direct disk accesses. <code>read(X)</code> copies item <span class="math inline">\(X\)</span> from the shared buffer block into the transaction’s private work area. <code>write(X)</code> copies the transaction’s local value of <span class="math inline">\(X\)</span> back into the shared buffer block. This write makes the new value visible to other transactions but does not yet touch disk — the buffer manager decides independently when to flush buffer blocks to disk. The moment <code>write(X)</code> executes, the updated value is in shared memory; isolation guarantees (enforced by locks) are what prevent other transactions from reading it prematurely.</p>
+<p>This architecture is what makes recovery hard: a transaction’s updates pass through memory on their way to disk, and a crash can interrupt that journey at any point.</p>
+<hr>
+</section>
+<section id="steal-and-force" class="level2">
+<h2 class="anchored" data-anchor-id="steal-and-force">4. Steal and Force</h2>
+<p>Given this model, two independent policy decisions by the buffer manager determine what the recovery system must be able to do.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-077.jpg" class="img-fluid figure-img"></p>
+<figcaption>Steal and Force Policies</figcaption>
+</figure>
+</div>
+<p><strong>Steal</strong>: may the buffer manager write a dirty page — one containing updates from an uncommitted transaction — to disk? The alternative is <strong>no-steal</strong>: dirty pages may not be evicted until the transaction commits. No-steal sounds appealing from a recovery standpoint, but it is impractical: if a transaction holds many buffer pages in its dirty state, no other transaction can use those buffer slots, and the entire database stalls. Production systems must allow steal.</p>
+<p><strong>Force</strong>: must the buffer manager flush all of a transaction’s updates to disk before the transaction is allowed to commit? The alternative is <strong>no-force</strong>: pages need not be on disk at commit time. Force is equally impractical: a transaction that updates many rows across many disk blocks would force the database to perform random I/O for every one of those blocks before the commit could complete, producing unacceptably high commit latency. Production systems use no-force.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-079.jpg" class="img-fluid figure-img"></p>
+<figcaption>Steal/Force 2×2 Matrix</figcaption>
+</figure>
+</div>
+<p>These two decisions produce a 2×2 matrix of policies. The easiest corner for recovery is <strong>no-steal + force</strong>: dirty pages never reach disk (so there is nothing to undo after a crash) and all committed updates are flushed (so there is nothing to redo). But this corner is the one no production system can afford. The hardest corner — and the one all production systems use — is <strong>steal + no-force</strong>: the buffer manager writes dirty pages whenever it needs space, and commits do not require flushing data to disk.</p>
+<p>The consequence is that both types of work are possible after a crash:</p>
+<ul>
+<li><strong>Undo</strong> work: a transaction was in progress, some of its dirty writes reached disk via steal, and now those writes must be reversed because the transaction never committed.</li>
+<li><strong>Redo</strong> work: a transaction committed, but some of its writes had not yet been flushed to disk (no-force), and so they must be reapplied.</li>
+</ul>
+<p>The logging mechanisms described in the rest of these notes exist to make both kinds of work possible.</p>
+<hr>
+</section>
+<section id="logs" class="level2">
+<h2 class="anchored" data-anchor-id="logs">5. Logs</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-081.jpg" class="img-fluid figure-img"></p>
+<figcaption>Log Structure</figcaption>
+</figure>
+</div>
+<p>A <strong>log</strong> is a record of every operation the database system performs, written sequentially to a separate log disk. Writing to the log is fast: log records are appended one after another to the same file, producing sequential I/O rather than the random I/O of writing data pages. In high-performance deployments, the log lives on a dedicated disk or set of disks that is never used for data pages, so log writes never compete with data writes.</p>
+<p>Every log record carries a <strong>Log Sequence Number (LSN)</strong> — a monotonically increasing integer that uniquely identifies the record and encodes its position in the log. LSNs are fundamental: they allow recovery to determine the order in which operations occurred and to check whether a given update has already been applied to a given page.</p>
+<p>The standard log record types are:</p>
+<ul>
+<li><code>&lt;T, START&gt;</code>: transaction <span class="math inline">\(T\)</span> has begun.</li>
+<li><code>&lt;T, COMMIT&gt;</code>: transaction <span class="math inline">\(T\)</span> has committed successfully.</li>
+<li><code>&lt;T, ABORT&gt;</code>: transaction <span class="math inline">\(T\)</span> has been aborted (all its changes have been undone).</li>
+<li><code>&lt;T, item, old_value, new_value&gt;</code>: transaction <span class="math inline">\(T\)</span> updated <code>item</code> from <code>old_value</code> to <code>new_value</code>.</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-082.jpg" class="img-fluid figure-img"></p>
+<figcaption>Log Record Examples</figcaption>
+</figure>
+</div>
+<p>The inclusion of both the old value and the new value in update records is essential. The new value allows redo; the old value allows undo. Some textbook formulations show only the new value (called deferred modification) or only the old value (immediate modification), but the standard practice in production systems — and what we use throughout — is to record both. As a practical matter, <code>item</code> is some form of record identifier (a tuple ID or physical location) that uniquely identifies the specific record being updated; the exact representation depends on the system.</p>
+<hr>
+</section>
+<section id="write-ahead-logging" class="level2">
+<h2 class="anchored" data-anchor-id="write-ahead-logging">6. Write-Ahead Logging</h2>
+<p>Two ordering requirements on log writes are non-negotiable.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-084.jpg" class="img-fluid figure-img"></p>
+<figcaption>Write-Ahead Logging</figcaption>
+</figure>
+</div>
+<p><strong>First requirement: the log record must reach disk before the corresponding data page.</strong> Suppose a transaction updates item <span class="math inline">\(A\)</span> from 100 to 150. If the update to <span class="math inline">\(A\)</span> is written to disk but the corresponding log record is not yet on disk, and the system then crashes, recovery has a problem: <span class="math inline">\(A\)</span> now shows 150 on disk, but there is no record that this was a change made by an uncommitted transaction. Recovery cannot undo the change because it does not know it happened. The fix is straightforward: <strong>always write the log record to disk before writing the data page to disk</strong>. This is the principle of <strong>Write-Ahead Logging (WAL)</strong>. The log record may safely sit on disk while the data page is still in memory; the reverse is not allowed.</p>
+<p><strong>Second requirement: log records must reach disk in LSN order.</strong> If the commit record for a transaction is on disk but an earlier update record for the same transaction is missing, recovery sees a committed transaction but does not know what it did — a state it cannot recover from, because the missing log record is gone and cannot be reconstructed. Log records written in strict LSN order ensures this cannot happen; since log records are appended sequentially to a file, this is the natural behavior.</p>
+<p>A third requirement follows from durability: <strong>a transaction is not considered committed until its <code>&lt;T, COMMIT&gt;</code> record is on disk.</strong> The system must not acknowledge a commit to the user — print the receipt, return success — until that record has been durably written. This is the one case where we do require something to be written before the acknowledgment: not a data page, but a log record. Because log writes are sequential and cheap, this does not impose the same penalty as force-flushing data pages.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-107.jpg" class="img-fluid figure-img"></p>
+<figcaption>LSN and pageLSN</figcaption>
+</figure>
+</div>
+<p>WAL is enforced mechanically through a field called <strong>pageLSN</strong> on every buffer page. When a transaction updates data on a page, the page’s pageLSN is set to the LSN of the corresponding log record. When the buffer manager prepares to write a page to disk, it checks the page’s pageLSN against the highest LSN that has been durably written to the log disk. If the log has not yet flushed through that LSN, the buffer manager waits until it has. This handshake ensures that log records always precede their corresponding data pages on disk.</p>
+<hr>
+</section>
+<section id="using-logs-to-abort-transactions-undo" class="level2">
+<h2 class="anchored" data-anchor-id="using-logs-to-abort-transactions-undo">7. Using Logs to Abort Transactions: UNDO</h2>
+<p>When a transaction must be aborted — whether because the application decided to cancel, because the user interrupted it, or because the database killed it to break a deadlock — its effects must be reversed. The log provides everything needed.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-087.jpg" class="img-fluid figure-img"></p>
+<figcaption>UNDO Algorithm</figcaption>
+</figure>
+</div>
+<p><strong>The undo algorithm</strong> traverses the log in reverse order, starting from the transaction’s most recent log record and working back to its <code>&lt;T, START&gt;</code> record. For each update record <code>&lt;T, item, old_value, new_value&gt;</code>, the algorithm restores <code>item</code> to <code>old_value</code>. This is straightforward: look at the log record, write the old value back to the buffer. No accounting for which updates were already applied to disk is needed — just write the old value.</p>
+<p>Going backward through the log is essential because a transaction may update the same item more than once. Working forward would restore an intermediate value rather than the original one.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-089.jpg" class="img-fluid figure-img"></p>
+<figcaption>Compensation Log Records</figcaption>
+</figure>
+</div>
+<p>Each undo action is itself logged. When the algorithm restores <code>item</code> to <code>old_value</code>, it writes a <strong>Compensation Log Record (CLR)</strong> of the form <code>&lt;T, item, old_value&gt;</code> to the log. After all updates have been undone, it writes <code>&lt;T, ABORT&gt;</code>. The CLRs serve a crucial purpose: if the system crashes while undo is in progress, the recovery process that runs on restart will encounter the CLRs and know which undo actions have already been applied, preventing double-undo.</p>
+<p><strong>Why strict two-phase locking is required for undo</strong>: the undo algorithm restores items to their old values, which requires holding locks on those items throughout the undo process. If a transaction had released its locks before abort — as would happen under plain 2PL’s shrinking phase — another transaction could have read or updated those items in the interim, making it impossible to cleanly reverse the original transaction. Strict 2PL’s guarantee that X-locks are held until the transaction commits or aborts ensures that no other transaction has touched the items being undone.</p>
+<hr>
+</section>
+<section id="using-logs-after-a-crash-redo" class="level2">
+<h2 class="anchored" data-anchor-id="using-logs-after-a-crash-redo">8. Using Logs After a Crash: REDO</h2>
+<p>A system crash wipes out all of memory. Every update that a committed transaction had written to the buffer pool but not yet flushed to disk is lost. The log, sitting safely on its separate disk, survives. Recovery uses it to reconstruct those lost updates.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-091.jpg" class="img-fluid figure-img"></p>
+<figcaption>REDO Algorithm</figcaption>
+</figure>
+</div>
+<p><strong>The redo algorithm</strong> traverses the log from the beginning in forward order, applying every update it encounters — including updates from transactions that ultimately committed, and also from transactions that were in progress and will later need to be undone. For each update record <code>&lt;T, item, old_value, new_value&gt;</code>, the algorithm writes <code>new_value</code> to <code>item</code> in the buffer, which will eventually reach disk.</p>
+<p>Crucially, the redo algorithm does not check whether a particular update is already reflected on disk — it simply applies it regardless. This simplicity is possible because update records are <strong>idempotent</strong>: setting <code>item</code> to <code>new_value</code> twice produces the same result as doing it once. This property depends on using <strong>value-based (physical) logging</strong> — recording the specific new value to be written — rather than operation-based logging, which would record something like “increment A by 100.” An increment is not idempotent: applying it twice produces the wrong answer. Value-based logging avoids this problem entirely, at the cost of slightly larger log records.</p>
+<p>After the redo phase completes, the buffer contains the state the database was in at the moment of the crash — including the partial updates of uncommitted transactions that had been written to the buffer before the crash. These must now be reversed.</p>
+<hr>
+</section>
+<section id="the-recovery-algorithm" class="level2">
+<h2 class="anchored" data-anchor-id="the-recovery-algorithm">9. The Recovery Algorithm</h2>
+<p>The complete recovery algorithm combines redo and undo in sequence.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-094.jpg" class="img-fluid figure-img"></p>
+<figcaption>Full Recovery Algorithm</figcaption>
+</figure>
+</div>
+<p><strong>Phase 1 — Redo</strong>: begin at the start of the log (we will later qualify this with checkpoints) and traverse forward. Maintain an <strong>undo list</strong> of transactions that have started but not yet committed or aborted. For each <code>&lt;T, START&gt;</code> record, add <span class="math inline">\(T\)</span> to the undo list. For each <code>&lt;T, COMMIT&gt;</code> or <code>&lt;T, ABORT&gt;</code> record, remove <span class="math inline">\(T\)</span> from the list. For each <code>&lt;T, item, old_value, new_value&gt;</code> record, apply the update. At the end of the log, the undo list contains exactly the transactions that were in progress when the crash occurred.</p>
+<p><strong>Phase 2 — Undo</strong>: traverse the log in reverse, applying undo to every update from a transaction in the undo list, writing CLRs for each, until all such transactions have been fully undone. Write <code>&lt;T, ABORT&gt;</code> for each one as it completes.</p>
+<p>The logic is deliberately simple: redo everything without discrimination, then undo the subset that needs undoing. There is apparent waste — redoing updates that will immediately be undone — but the simplicity of reasoning about the system’s correctness justifies it. More sophisticated implementations (such as ARIES) avoid some of this work by tracking which pages have already been updated on disk and skipping unnecessary redo, but the basic algorithm here is the foundation.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-096.jpg" class="img-fluid figure-img"></p>
+<figcaption>Recovery Example</figcaption>
+</figure>
+</div>
+<p>Consider a concrete example: the log contains entries for T0 (which committed) and T1 (which was in progress when the crash occurred). The redo phase applies all updates from both transactions. T1 is in the undo list at the end. The undo phase reverses T1’s updates in reverse order, writing CLRs, and then writes <code>&lt;T1, ABORT&gt;</code>. The result is that T0’s committed changes are fully reflected and T1 leaves no trace.</p>
+<hr>
+</section>
+<section id="checkpointing" class="level2">
+<h2 class="anchored" data-anchor-id="checkpointing">10. Checkpointing</h2>
+<p>Starting the redo phase at the very beginning of the log is impractical: the log may span days or months of operations, and replaying it from the start would make restart recovery take hours. <strong>Checkpointing</strong> solves this.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-101.jpg" class="img-fluid figure-img"></p>
+<figcaption>Checkpointing</figcaption>
+</figure>
+</div>
+<p>A checkpoint proceeds in three steps. First, the database stops accepting new transactions temporarily. Second, it flushes the entire contents of the buffer pool to disk — not just the updates of committed transactions, but everything, including dirty pages from uncommitted transactions. Third, it writes a special <strong>checkpoint record</strong> to the log listing all transactions that are currently active (started but not yet committed or aborted), and ensures this record reaches disk.</p>
+<p>After a checkpoint, the recovery system knows that every update recorded in the log up to the checkpoint is already on disk. The redo phase therefore does not need to go back further than the last checkpoint.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-104.jpg" class="img-fluid figure-img"></p>
+<figcaption>Using the Checkpoint Record</figcaption>
+</figure>
+</div>
+<p><strong>Why the active transaction list is essential</strong>: suppose a transaction T0 started before the checkpoint and was still running when the checkpoint was taken. T0’s updates up to the checkpoint were flushed to disk. T0 then continued, making additional updates after the checkpoint. The system crashes. When recovery begins, the redo phase starts at the checkpoint record and processes only log entries after it. Without the active transaction list in the checkpoint record, the recovery system would never see T0’s <code>&lt;T0, START&gt;</code> record — it starts too late in the log — and would not know to include T0 in the undo list. T0’s updates from before the checkpoint would remain incorrectly on disk with no corresponding abort record.</p>
+<p>The checkpoint record’s list of active transactions seeds the initial undo list. Transactions in that list that appear nowhere in the post-checkpoint log are still added to the undo list, and the undo phase looks back into the pre-checkpoint log as needed to undo their updates.</p>
+<p><strong>The modified recovery algorithm with checkpoints</strong>:</p>
+<ul>
+<li>Find the most recent checkpoint record in the log.</li>
+<li>Initialize the undo list with the active transaction list from the checkpoint record.</li>
+<li>Begin the redo phase at the checkpoint record and proceed forward to the end of the log, updating the undo list as before.</li>
+<li>Perform the undo phase as described, consulting pre-checkpoint log records when necessary.</li>
+</ul>
+<p>Checkpoints are taken periodically (say, every 60 seconds) to bound the amount of log that must be replayed after a crash.</p>
+<hr>
+</section>
+<section id="putting-it-together-undo-redo-and-the-stealforce-matrix" class="level2">
+<h2 class="anchored" data-anchor-id="putting-it-together-undo-redo-and-the-stealforce-matrix">11. Putting It Together: UNDO, REDO, and the Steal/Force Matrix</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-109.jpg" class="img-fluid figure-img"></p>
+<figcaption>Steal/Force and Log Requirements</figcaption>
+</figure>
+</div>
+<p>The relationship between steal/force policy and log requirements is direct:</p>
+<ul>
+<li><p><strong>Steal</strong> makes dirty pages from uncommitted transactions reachable on disk before commit. If the system crashes, those pages must be reversed. This is what the <strong>undo log</strong> (old values in update records) enables. Without steal, no uncommitted updates ever reach disk before commit, and undo for recovery purposes is unnecessary — though undo is still needed for transaction aborts.</p></li>
+<li><p><strong>No-force</strong> means committed transactions may have updates sitting only in memory at the time the commit acknowledgment is sent. If the system crashes, those updates are lost. This is what the <strong>redo log</strong> (new values in update records) enables. Without no-force (i.e., with force), all updates are guaranteed on disk at commit time, and redo is unnecessary.</p></li>
+</ul>
+<p>The steal + no-force combination — the one all production systems use — requires both undo and redo logs, which is exactly what the log record format <code>&lt;T, item, old_value, new_value&gt;</code> provides.</p>
+<p><strong>CLRs and the interaction of undo and redo</strong>: CLRs make the redo phase safe even when it encounters a transaction that was being aborted at the time of the crash. Without CLRs, redoing a partial undo would leave the database in a state that differs from what the undo algorithm intended. With CLRs, the redo phase simply applies them like any other log record, faithfully reconstructing the state the undo was producing. The undo phase then continues from where undo left off before the crash.</p>
+<hr>
+</section>
+<section id="limitations-and-the-aries-system" class="level2">
+<h2 class="anchored" data-anchor-id="limitations-and-the-aries-system">12. Limitations and the ARIES System</h2>
+<p>The algorithm described here is intentionally simplified. Production-grade recovery systems address several additional challenges:</p>
+<p><strong>Non-quiescing checkpoints</strong>: stopping all transactions during checkpointing is unacceptable in a high-throughput system. Fuzzy checkpointing allows transactions to continue running during the checkpoint. This requires more careful bookkeeping to ensure that the recovery algorithm can still find a consistent starting point.</p>
+<p><strong>System crashes during recovery</strong>: the recovery process itself can crash. Our algorithm is actually tolerant of this: because CLRs are written and redo is idempotent, restarting recovery from the last checkpoint and replaying the log produces the correct result regardless of how many times the recovery process is interrupted.</p>
+<p><strong>B-tree indexes</strong>: strict two-phase locking cannot be applied to B-tree pages in a naive way. Updating a B-tree during a transaction may require structural modifications (splits and merges) that must release locks on intermediate nodes before the transaction commits, otherwise the entire tree would be locked for the duration of every insert or delete. This requires <strong>logical logging</strong> — recording the logical operation rather than the physical page change — which introduces its own complications for undo and redo. This is an active area of database systems research, covered in graduate-level courses.</p>
+<p><strong>ARIES</strong> (Algorithm for Recovery and Isolation Exploiting Semantics) is the canonical description of log-based recovery as implemented in production systems. First described in a 1992 research paper by Mohan et al., ARIES addresses all of the above: fuzzy checkpointing, crash-during-recovery, logical logging for indexes, nested transactions, and more. The ideas from ARIES underlie the recovery systems in IBM DB2, SQL Server, PostgreSQL, and most other major database engines. It remains required reading in graduate database courses.</p>
+<hr>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">13. Summary</h2>
+<p>Recovery guarantees atomicity and durability despite two competing pressures: the need to allow the buffer manager to flush dirty pages at will (steal, for performance), and the need to avoid flushing data to disk at commit time (no-force, for low commit latency). Both policies create the possibility of incorrect disk state after a crash.</p>
+<p>The solution is logging:</p>
+<ul>
+<li>Every update is recorded in a log with both its old and new value, before the update is applied (WAL).</li>
+<li>Log records are flushed in LSN order; a transaction is committed only when its commit record reaches the log disk.</li>
+<li>After a crash, <strong>redo</strong> replays the log forward from the last checkpoint, reconstructing the buffer state at the time of crash.</li>
+<li><strong>Undo</strong> then reverses the updates of uncommitted transactions, writing CLRs to make undo itself recoverable.</li>
+<li><strong>Checkpoints</strong> bound the length of log that must be replayed, by periodically flushing all dirty pages and recording the list of active transactions.</li>
+<li>Strict two-phase locking is required throughout: locks must be held until commit or abort to ensure that undo can cleanly reverse a transaction’s effects without interference.</li>
+</ul>
+<p>The next set of notes covers the final topic: distributed transactions, where atomicity and durability must be guaranteed across multiple machines that can each fail independently.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

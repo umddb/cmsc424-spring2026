@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.29">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>CMSC424: Transactions — Lock-Based Concurrency Control – CMSC424 Lecture Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">CMSC424 Lecture Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-lectures" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Lectures</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-lectures">    
+        <li>
+    <a class="dropdown-item" href="./storage_1.html">
+ <span class="dropdown-text">Computing and Storage Hardware</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_2.html">
+ <span class="dropdown-text">File Organization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./storage_3.html">
+ <span class="dropdown-text">Indexes</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_1.html">
+ <span class="dropdown-text">Query Processing: Plans, Pipelining, Cost</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_2.html">
+ <span class="dropdown-text">Query Processing: Selections and Joins</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_3.html">
+ <span class="dropdown-text">Query Processing: Sort-Merge, Aggregation, External Memory</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_4.html">
+ <span class="dropdown-text">Query Processing: Intro to Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_5.html">
+ <span class="dropdown-text">Query Processing: Equivalence Rules</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_6.html">
+ <span class="dropdown-text">Query Processing: Cost Estimation and Statistics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_7.html">
+ <span class="dropdown-text">Query Processing: Join Size and Search Algorithms</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_8.html">
+ <span class="dropdown-text">Query Processing: Parallel and Distributed Architectures</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./query_processing_9.html">
+ <span class="dropdown-text">Query Processing: Parallel Operator Execution</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_1.html">
+ <span class="dropdown-text">Transactions: ACID and Serializability</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_2.html">
+ <span class="dropdown-text">Transactions: Lock-Based Concurrency Control</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_3.html">
+ <span class="dropdown-text">Transactions: MVCC and Isolation Levels</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_4_5.html">
+ <span class="dropdown-text">Transactions: Recovery and Logging</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./transactions_6.html">
+ <span class="dropdown-text">Transactions: Distributed Transactions and 2PC</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-concurrency-problem" id="toc-the-concurrency-problem" class="nav-link active" data-scroll-target="#the-concurrency-problem">1. The Concurrency Problem</a></li>
+  <li><a href="#shared-and-exclusive-locks" id="toc-shared-and-exclusive-locks" class="nav-link" data-scroll-target="#shared-and-exclusive-locks">2. Shared and Exclusive Locks</a></li>
+  <li><a href="#why-locking-alone-is-not-enough" id="toc-why-locking-alone-is-not-enough" class="nav-link" data-scroll-target="#why-locking-alone-is-not-enough">3. Why Locking Alone Is Not Enough</a></li>
+  <li><a href="#two-phase-locking-2pl" id="toc-two-phase-locking-2pl" class="nav-link" data-scroll-target="#two-phase-locking-2pl">4. Two-Phase Locking (2PL)</a></li>
+  <li><a href="#recoverability-and-strict-2pl" id="toc-recoverability-and-strict-2pl" class="nav-link" data-scroll-target="#recoverability-and-strict-2pl">5. Recoverability and Strict 2PL</a></li>
+  <li><a href="#implementation-the-lock-table" id="toc-implementation-the-lock-table" class="nav-link" data-scroll-target="#implementation-the-lock-table">6. Implementation: The Lock Table</a></li>
+  <li><a href="#deadlocks" id="toc-deadlocks" class="nav-link" data-scroll-target="#deadlocks">7. Deadlocks</a>
+  <ul class="collapse">
+  <li><a href="#deadlock-detection" id="toc-deadlock-detection" class="nav-link" data-scroll-target="#deadlock-detection">7.1 Deadlock Detection</a></li>
+  <li><a href="#deadlock-prevention" id="toc-deadlock-prevention" class="nav-link" data-scroll-target="#deadlock-prevention">7.2 Deadlock Prevention</a></li>
+  </ul></li>
+  <li><a href="#multi-granularity-locking" id="toc-multi-granularity-locking" class="nav-link" data-scroll-target="#multi-granularity-locking">8. Multi-Granularity Locking</a>
+  <ul class="collapse">
+  <li><a href="#the-granularity-hierarchy" id="toc-the-granularity-hierarchy" class="nav-link" data-scroll-target="#the-granularity-hierarchy">8.1 The Granularity Hierarchy</a></li>
+  <li><a href="#intention-locks" id="toc-intention-locks" class="nav-link" data-scroll-target="#intention-locks">8.2 Intention Locks</a></li>
+  <li><a href="#compatibility-matrix" id="toc-compatibility-matrix" class="nav-link" data-scroll-target="#compatibility-matrix">8.3 Compatibility Matrix</a></li>
+  <li><a href="#practical-example" id="toc-practical-example" class="nav-link" data-scroll-target="#practical-example">8.4 Practical Example</a></li>
+  </ul></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">9. Summary</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CMSC424: Transactions — Lock-Based Concurrency Control</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><em>Instructor: Amol Deshpande</em></p>
+<hr>
+<section id="the-concurrency-problem" class="level2">
+<h2 class="anchored" data-anchor-id="the-concurrency-problem">1. The Concurrency Problem</h2>
+<p>When multiple transactions execute simultaneously against the same database, their operations can interleave in ways that produce incorrect results — even when each individual transaction is correct. The course-enrollment example from the previous notes illustrates this concisely: two students simultaneously checking and updating the same enrollment count can both pass the capacity check when only one should, leading to a section that is over capacity.</p>
+<p>The obvious solution — run one transaction at a time — produces a serial schedule that is always correct. But serial execution is completely impractical at scale. Consider a ticketing system like Ticketmaster during a high-demand concert sale: hundreds of thousands of users are simultaneously selecting seats. Each user takes minutes to choose and pay. A strict queue would be absurdly long. The system must allow concurrent execution.</p>
+<p>The question is therefore how to allow interleaving while preventing incorrect outcomes. The classical answer, developed in the database literature starting in the mid-1970s, is <strong>locking</strong>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-015.jpg" class="img-fluid figure-img"></p>
+<figcaption>Lock-based Protocols: S and X Locks</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="shared-and-exclusive-locks" class="level2">
+<h2 class="anchored" data-anchor-id="shared-and-exclusive-locks">2. Shared and Exclusive Locks</h2>
+<p>The foundational insight is that not all concurrent access is dangerous. Two transactions reading the same data item simultaneously cause no harm — they both see the correct value and neither changes anything. Only writes create problems.</p>
+<p>This leads to two lock types:</p>
+<ul>
+<li><strong>Shared lock (S-lock)</strong>, also called a read lock: any number of transactions may hold a shared lock on the same item simultaneously. A transaction must acquire an S-lock before reading a data item.</li>
+<li><strong>Exclusive lock (X-lock)</strong>, also called a write lock: only one transaction may hold an exclusive lock on an item at a time. A transaction must acquire an X-lock before writing a data item.</li>
+</ul>
+<p>The compatibility rule is simple: shared locks are compatible with other shared locks, but exclusive locks are incompatible with everything — a transaction requesting an X-lock must wait until all current lock holders (shared or exclusive) have released.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-016.jpg" class="img-fluid figure-img"></p>
+<figcaption>Lock Compatibility and the Lock Manager</figcaption>
+</figure>
+</div>
+<p>A dedicated module in the database system — the <strong>lock manager</strong> — processes all lock requests. Its core data structure is a hash table keyed on data item identifiers. Each entry records which transactions currently hold locks on that item and which transactions are queued waiting. When a lock request arrives, the lock manager checks compatibility with current holders: if compatible, it grants the lock immediately; otherwise, the requesting transaction waits in a queue. When a transaction releases a lock, the lock manager removes the entry, inspects the queue, and grants the lock to the next compatible waiter.</p>
+<p>These are <strong>logical locks</strong>, not operating system mutexes or file system locks. The lock manager makes decisions at the level of database objects — tuples, relations, or whatever granularity the system defines. Because every transaction routes its lock requests through the lock manager, it is a high-contention component that must be implemented with great care in production systems.</p>
+<hr>
+</section>
+<section id="why-locking-alone-is-not-enough" class="level2">
+<h2 class="anchored" data-anchor-id="why-locking-alone-is-not-enough">3. Why Locking Alone Is Not Enough</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-017.jpg" class="img-fluid figure-img"></p>
+<figcaption>Just Locking Isn’t Enough</figcaption>
+</figure>
+</div>
+<p>Requiring transactions to acquire locks before accessing data is necessary but not sufficient for correctness. Consider a transaction T1 that transfers money from account B to account A: it locks B, reads B, subtracts 50, writes B, <strong>unlocks B</strong>, then locks A, reads A, adds 50, writes A, unlocks A. Between the unlock of B and the lock of A, T1 holds no locks at all.</p>
+<p>If another transaction T2 arrives in this gap and acquires locks on both A and B, performs its own updates, and commits — the schedule is no longer serializable. T2 “snuck in” between T1’s two critical operations and observed an inconsistent intermediate state.</p>
+<p>The fix is to constrain <em>when</em> unlocks may occur, not just whether locks are held.</p>
+<hr>
+</section>
+<section id="two-phase-locking-2pl" class="level2">
+<h2 class="anchored" data-anchor-id="two-phase-locking-2pl">4. Two-Phase Locking (2PL)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-018.jpg" class="img-fluid figure-img"></p>
+<figcaption>Two-Phase Locking Protocol</figcaption>
+</figure>
+</div>
+<p><strong>Two-phase locking (2PL)</strong> imposes one rule: a transaction may never acquire a lock after it has released any lock. This partitions a transaction’s execution into exactly two phases:</p>
+<ol type="1">
+<li><strong>Growing phase</strong>: the transaction acquires locks — shared or exclusive — as needed. It may not release any lock during this phase.</li>
+<li><strong>Shrinking phase</strong>: the transaction releases locks one by one. It may not acquire any new lock during this phase.</li>
+</ol>
+<p>The rule prevents the “gap” problem above: once a transaction releases any lock, it enters the shrinking phase and can never lock anything new. The intermediate state a transaction exposes between an unlock and a subsequent lock is therefore never possible.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-019.jpg" class="img-fluid figure-img"></p>
+<figcaption>2PL Example with Lock Point</figcaption>
+</figure>
+</div>
+<p>The <strong>lock point</strong> of a transaction is the moment it acquires its last lock — the boundary between its growing and shrinking phases. A key theorem: if transaction <span class="math inline">\(T_i\)</span>’s lock point precedes transaction <span class="math inline">\(T_j\)</span>’s lock point, then in any serializable execution <span class="math inline">\(T_i\)</span> is serialized before <span class="math inline">\(T_j\)</span>. Stated differently, the equivalent serial schedule for any 2PL-compliant concurrent execution is simply the transactions in lock-point order.</p>
+<p>In practice, most transactions acquire all their locks during execution and then release them in one batch at the end — the lock point is thus near the commit point. This is the common implementation pattern.</p>
+<p><strong>2PL guarantees serializability.</strong> This was one of the central results of the 1976 paper that established the locking framework and has not changed since.</p>
+<hr>
+</section>
+<section id="recoverability-and-strict-2pl" class="level2">
+<h2 class="anchored" data-anchor-id="recoverability-and-strict-2pl">5. Recoverability and Strict 2PL</h2>
+<p>2PL guarantees serializability but does <strong>not</strong> guarantee recoverability. A schedule is <strong>recoverable</strong> if no transaction commits until all transactions whose writes it read have also committed.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-020.jpg" class="img-fluid figure-img"></p>
+<figcaption>2PL Does Not Guarantee Recoverability</figcaption>
+</figure>
+</div>
+<p>Consider: T1 locks A, updates it, and unlocks A (still compliant with 2PL — this is the shrinking phase). T2 then locks A, reads T1’s updated value, and commits. Now T1 encounters an error and must abort. T1’s changes to A must be rolled back — but T2 has already read that value and committed. T2’s committed state is based on data that never officially existed. This is called a <strong>dirty read</strong>, and the cascade of aborts it can trigger — T3 read T2’s value, so T3 must also abort, and so on — is called <strong>cascading rollback</strong>.</p>
+<p>Once a transaction commits, its effects are permanent (durability). There is no way to “un-commit” T2 just because T1 aborted. The schedule is unrecoverable.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-022.jpg" class="img-fluid figure-img"></p>
+<figcaption>Strict 2PL</figcaption>
+</figure>
+</div>
+<p>The solution is <strong>strict two-phase locking (Strict 2PL)</strong>: a transaction must hold all its <strong>exclusive locks until it commits or aborts</strong>. Shared locks may be released earlier, but X-locks — the ones that represent writes — are held until the transaction’s final decision.</p>
+<p>Under Strict 2PL, T1 holds the X-lock on A until it commits or aborts. T2 cannot read T1’s updated value of A until T1 has finished. If T1 aborts, T2 never sees the dirty value. If T1 commits, T2’s read is of a committed value and no cascade occurs.</p>
+<p>The cost is that T1 holds its locks longer, which reduces concurrency. Other transactions wanting to access A must wait for T1’s entire execution to complete. But the correctness guarantees are worth it: Strict 2PL produces both serializable and recoverable schedules.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-024.jpg" class="img-fluid figure-img"></p>
+<figcaption>Strict 2PL Example and Lock Conversion</figcaption>
+</figure>
+</div>
+<p>A further tightening, <strong>rigorous 2PL</strong>, holds both shared and exclusive locks until commit. The practical difference is minor; Strict 2PL is the standard choice.</p>
+<p><strong>Lock conversion</strong> is permitted: a transaction may upgrade a shared lock to an exclusive lock (when it decides to write something it originally only read). Downgrading — converting X to S — is not permitted, because releasing exclusive access is equivalent to entering the shrinking phase, and 2PL then prohibits further lock acquisitions.</p>
+<hr>
+</section>
+<section id="implementation-the-lock-table" class="level2">
+<h2 class="anchored" data-anchor-id="implementation-the-lock-table">6. Implementation: The Lock Table</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-026.jpg" class="img-fluid figure-img"></p>
+<figcaption>Lock Table</figcaption>
+</figure>
+</div>
+<p>The lock manager’s data structure is a hash table mapping data item identifiers to lock records. Each record contains: - The list of transactions currently holding locks on the item, with their lock modes - The queue of transactions waiting for a lock, in order of arrival</p>
+<p>Granted locks are shown in one region; waiting requests in another. When a transaction releases a lock, its entry is removed from the granted list and the lock manager checks the queue: if the next waiter’s requested mode is compatible with any remaining granted locks, the lock is granted; otherwise, it continues waiting.</p>
+<p>Every transaction sends every lock request and every unlock to the lock manager. In a busy production database with thousands of transactions per second, the lock table is one of the hottest data structures in the system and is implemented with specialized low-level techniques (fine-grained internal locking, cache-aligned structures) rather than a general-purpose hash table.</p>
+<hr>
+</section>
+<section id="deadlocks" class="level2">
+<h2 class="anchored" data-anchor-id="deadlocks">7. Deadlocks</h2>
+<p>Even with 2PL in place, the system can reach a state where two or more transactions are each waiting for a lock held by another — a <strong>deadlock</strong>. Neither transaction can proceed, and neither will release its locks, because it cannot make progress without acquiring the lock it is waiting for.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-027.jpg" class="img-fluid figure-img"></p>
+<figcaption>Deadlocks</figcaption>
+</figure>
+</div>
+<p>A simple example: T1 holds an X-lock on B and requests a lock on A. T2 holds an X-lock on A and requests a lock on B. T1 waits for T2 to release A; T2 waits for T1 to release B. Both are stuck indefinitely. 2PL does not prevent this — both transactions are following the protocol correctly.</p>
+<section id="deadlock-detection" class="level3">
+<h3 class="anchored" data-anchor-id="deadlock-detection">7.1 Deadlock Detection</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-028.jpg" class="img-fluid figure-img"></p>
+<figcaption>Wait-For Graph and Detection</figcaption>
+</figure>
+</div>
+<p>The detection approach: maintain a <strong>wait-for graph</strong> in which nodes are transactions and a directed edge <span class="math inline">\(T_i \to T_j\)</span> means <span class="math inline">\(T_i\)</span> is waiting for <span class="math inline">\(T_j\)</span> to release a lock. A deadlock exists if and only if the wait-for graph contains a cycle.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-029.jpg" class="img-fluid figure-img"></p>
+<figcaption>Deadlock Recovery</figcaption>
+</figure>
+</div>
+<p>When a cycle is detected, the lock manager must <strong>abort one transaction</strong> in the cycle to break it. The aborted transaction releases all its locks, allowing the others to proceed. The aborted transaction is then restarted. To choose which transaction to abort, systems prefer the one with the least work done so far — minimizing wasted effort. Care must be taken to avoid <strong>starvation</strong>: a transaction that is repeatedly chosen as the victim and never gets to complete. Systems track how many times a transaction has been aborted and deprioritize it as a victim once it has suffered enough.</p>
+<p>Deadlock detection by cycle-finding works, but has overhead: the wait-for graph must be maintained and scanned periodically. This was an acceptable approach in early systems but is considered too expensive in modern, high-throughput databases.</p>
+</section>
+<section id="deadlock-prevention" class="level3">
+<h3 class="anchored" data-anchor-id="deadlock-prevention">7.2 Deadlock Prevention</h3>
+<p>Modern systems prefer to prevent deadlocks from occurring rather than detecting and recovering from them.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-031.jpg" class="img-fluid figure-img"></p>
+<figcaption>Deadlock Prevention Strategies</figcaption>
+</figure>
+</div>
+<p><strong>Solution 1 — Pre-declare all locks</strong>: require a transaction to acquire all the locks it will ever need before beginning execution. No deadlock is possible because a transaction never waits for a lock after it starts. This is largely impractical: transactions often do not know which items they will access until they execute, and the pre-declaration step itself can deadlock.</p>
+<p><strong>Solution 2 — Lock ordering</strong>: assign a global total order to all data items and require every transaction to request locks in that order — never requesting a lock on an item with a lower order number than a lock it already holds. If all transactions follow this discipline, cycles in the wait-for graph cannot form: a cycle would require some transaction <span class="math inline">\(T_i\)</span> to be waiting for <span class="math inline">\(T_j\)</span> (meaning <span class="math inline">\(T_i\)</span> wants something <span class="math inline">\(T_j\)</span> holds, so <span class="math inline">\(T_j\)</span> is “ahead” in the order) and also <span class="math inline">\(T_j\)</span> waiting for <span class="math inline">\(T_i\)</span> (meaning <span class="math inline">\(T_i\)</span> is “ahead”), which is a contradiction. Lock ordering guarantees deadlock freedom without any coordination between transactions.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-032.jpg" class="img-fluid figure-img"></p>
+<figcaption>Timestamp-Based Prevention</figcaption>
+</figure>
+</div>
+<p><strong>Solution 3 — Timestamp-based schemes</strong>: assign each transaction a timestamp when it enters the system. Older timestamps precede newer ones. Two schemes:</p>
+<ul>
+<li><strong>Wait-die</strong>: if an older transaction wants a lock held by a newer transaction, it waits. If a newer transaction wants a lock held by an older transaction, the newer transaction aborts (it “dies”) and restarts with its original timestamp. Edges in the wait-for graph can only go from newer to older, so no cycle is possible.</li>
+<li><strong>Wound-wait</strong>: if an older transaction wants a lock held by a newer transaction, the older transaction preempts — it “wounds” the newer transaction, forcing it to abort. If a newer transaction wants a lock held by an older one, the newer transaction waits. Again, the wait-for graph is acyclic.</li>
+</ul>
+<p>Both schemes are <strong>proactive</strong>: they abort transactions that may not actually be in a deadlock, wasting their work so far. The tradeoff is simplicity and a guaranteed deadlock-free schedule.</p>
+<p><strong>Solution 4 — Timeout</strong>: if a transaction has been waiting for a lock for longer than a configured threshold (e.g., 50ms), it aborts and restarts. This is the simplest scheme to implement — no wait-for graph, no timestamps, no coordination. The downside is that it provides no hard guarantee against deadlocks (two transactions could both time out and restart into the same deadlock), and it can cause unnecessary aborts when a transaction is simply waiting on a legitimate but slow transaction rather than a deadlock. Despite these limitations, timeout-based deadlock handling is common in practice because of its simplicity.</p>
+<hr>
+</section>
+</section>
+<section id="multi-granularity-locking" class="level2">
+<h2 class="anchored" data-anchor-id="multi-granularity-locking">8. Multi-Granularity Locking</h2>
+<p>The discussion so far has treated “data items” as an abstract concept. In practice, a database has objects at many levels: individual attribute values, tuples, pages, relations (tables), and the entire database. The question of <em>what level to lock</em> has significant performance implications.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-033.jpg" class="img-fluid figure-img"></p>
+<figcaption>Locking Granularity</figcaption>
+</figure>
+</div>
+<p><strong>Coarse-grained locking</strong> (locking entire tables) has low overhead — one lock per table — but severely limits concurrency. If a transaction locks the <code>takes</code> relation to update one enrollment record, no other transaction can touch any record in <code>takes</code> at all. MongoDB, famously, used collection-level locks for most of its early history, and this was a significant bottleneck.</p>
+<p><strong>Fine-grained locking</strong> (locking individual tuples) provides excellent concurrency — two transactions updating different students can proceed simultaneously — but has high overhead. A transaction that updates every instructor’s salary would need to acquire and release one lock per tuple. For a relation with millions of rows, this is prohibitive.</p>
+<p>What is needed is a system that lets transactions lock at whichever level is appropriate: a tuple-level update takes a tuple lock; a full-table scan and update takes a table lock. The challenge is that the lock manager needs to detect conflicts between locks taken at different levels.</p>
+<section id="the-granularity-hierarchy" class="level3">
+<h3 class="anchored" data-anchor-id="the-granularity-hierarchy">8.1 The Granularity Hierarchy</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-034.jpg" class="img-fluid figure-img"></p>
+<figcaption>Granularity Hierarchy</figcaption>
+</figure>
+</div>
+<p>Data objects are organized into a hierarchy: the database at the root, containing areas (logical groupings), containing relations (tables), containing tuples. A lock on any node in the hierarchy implicitly covers all descendants — a table-level lock covers every tuple in that table.</p>
+<p>The problem: if transaction T1 holds an X-lock on the entire database and transaction T2 tries to lock a single tuple, the lock table has no entry for that specific tuple. The lock manager cannot detect the conflict without scanning the entire hierarchy, which is too expensive.</p>
+</section>
+<section id="intention-locks" class="level3">
+<h3 class="anchored" data-anchor-id="intention-locks">8.2 Intention Locks</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-035.jpg" class="img-fluid figure-img"></p>
+<figcaption>Intention Lock Protocol</figcaption>
+</figure>
+</div>
+<p>The solution is <strong>intention locks</strong>. When a transaction wants to lock a node at any level, it must first acquire intention locks on all ancestors, starting from the root and working down. Three new lock modes:</p>
+<ul>
+<li><strong>IS (intention shared)</strong>: the transaction intends to acquire S-locks on some descendant(s).</li>
+<li><strong>IX (intention exclusive)</strong>: the transaction intends to acquire X-locks on some descendant(s).</li>
+<li><strong>SIX (shared + intention exclusive)</strong>: the transaction holds a shared lock on this node (reads all descendants) and also intends to acquire X-locks on some specific descendants.</li>
+</ul>
+<p>The protocol: before locking node <span class="math inline">\(N\)</span>, acquire an IS or IX lock on every ancestor of <span class="math inline">\(N\)</span> (from root to parent of <span class="math inline">\(N\)</span>), then acquire the desired lock on <span class="math inline">\(N\)</span> itself.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-036.jpg" class="img-fluid figure-img"></p>
+<figcaption>Example: Locking in the Hierarchy</figcaption>
+</figure>
+</div>
+<p><strong>Example</strong>: to acquire an S-lock on relation <span class="math inline">\(F_a\)</span>, first acquire IS on the database, IS on the area containing <span class="math inline">\(F_a\)</span>, then S on <span class="math inline">\(F_a\)</span> itself. To acquire an X-lock on tuple <span class="math inline">\(r_{c1}\)</span>, first acquire IX on the database, IX on the area, IX on the relation <span class="math inline">\(F_c\)</span>, then X on <span class="math inline">\(r_{c1}\)</span>.</p>
+<p>This solves the detection problem: when T2 wants to lock a tuple, it must first traverse the hierarchy and acquire IX locks on each ancestor. At the database level, it sees T1’s X-lock, detects the conflict, and waits. The conflict is detected at the coarsest level where it exists — exactly where we want it.</p>
+</section>
+<section id="compatibility-matrix" class="level3">
+<h3 class="anchored" data-anchor-id="compatibility-matrix">8.3 Compatibility Matrix</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-038.jpg" class="img-fluid figure-img"></p>
+<figcaption>Compatibility Matrix</figcaption>
+</figure>
+</div>
+<p>The five lock modes have the following compatibility rules when two transactions request the same node:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th></th>
+<th>IS</th>
+<th>IX</th>
+<th>S</th>
+<th>SIX</th>
+<th>X</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>IS</strong></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+</tr>
+<tr class="even">
+<td><strong>IX</strong></td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr class="odd">
+<td><strong>S</strong></td>
+<td>✓</td>
+<td>✗</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr class="even">
+<td><strong>SIX</strong></td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr class="odd">
+<td><strong>X</strong></td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+</tbody>
+</table>
+<p>The intuition: two IS locks are compatible because both are just signaling intent — the actual conflicts, if any, will be detected at the lower levels where the real S or X locks are acquired. IX and S are incompatible because a shared lock on a node means the holder is reading all descendants; an IX lock on the same node means some other transaction will be writing some descendant — a direct conflict. SIX and IX are incompatible for similar reasons.</p>
+</section>
+<section id="practical-example" class="level3">
+<h3 class="anchored" data-anchor-id="practical-example">8.4 Practical Example</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-041.jpg" class="img-fluid figure-img"></p>
+<figcaption>Multi-Granularity Examples</figcaption>
+</figure>
+</div>
+<p>Three common patterns and the appropriate lock modes:</p>
+<ul>
+<li><p><strong>T1 scans the entire relation and updates a few tuples</strong> (e.g., give raises to instructors earning less than $80,000): T1 acquires a <strong>SIX lock</strong> on the relation — this signals that T1 is reading everything (the S component) and will write some specific tuples (the IX component). For each tuple it updates, T1 acquires an X-lock on that individual tuple.</p></li>
+<li><p><strong>T2 uses an index to read a subset of tuples</strong> (e.g., find all music instructors): T2 acquires an <strong>IS lock</strong> on the relation and then individual <strong>S-locks</strong> on each tuple it reads.</p></li>
+<li><p><strong>T3 reads the entire relation</strong> (e.g., compute average salary): T3 can acquire a single <strong>S lock</strong> on the entire relation, covering all tuples without per-tuple overhead.</p></li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">9. Summary</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="transactions-jpegs/tr-042.jpg" class="img-fluid figure-img"></p>
+<figcaption>Locking-Based Concurrency Control Recap</figcaption>
+</figure>
+</div>
+<p>Lock-based concurrency control was the dominant technique in database systems for three decades and remains in use today:</p>
+<ul>
+<li><strong>S/X locks</strong> differentiate reads from writes; shared locks are mutually compatible, exclusive locks are not.</li>
+<li><strong>2PL</strong> (growing phase then shrinking phase) guarantees serializability — the equivalent serial order is the lock-point order of transactions.</li>
+<li><strong>Strict 2PL</strong> holds exclusive locks until commit or abort, additionally guaranteeing recoverability and preventing cascading aborts.</li>
+<li><strong>Deadlock detection</strong> uses a wait-for graph; cycles indicate deadlock, resolved by aborting and restarting one transaction. <strong>Deadlock prevention</strong> strategies (lock ordering, timestamp-based schemes, timeouts) eliminate deadlocks proactively at the cost of some wasted work.</li>
+<li><strong>Multi-granularity locking</strong> with intention locks (IS, IX, SIX) allows transactions to lock at whichever level is appropriate — table-level for bulk updates, tuple-level for targeted updates — while still correctly detecting conflicts across levels.</li>
+</ul>
+<p>Despite its elegance and strong correctness guarantees, locking has a significant drawback: readers block writers and writers block readers. This limits concurrency on read-heavy analytical workloads, which are common in modern systems. The dominant concurrency control technique in production databases today is <strong>multiversion concurrency control (MVCC)</strong>, which avoids read-write conflicts by giving each reader a consistent snapshot of the database without locking. That is the subject of the next set of notes.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/umddb\.github\.io\/cmsc424-spring2026\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

@@ -1,59 +1,79 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/transactions_3.html</loc>
+    <lastmod>2026-05-01T13:23:10.681Z</lastmod>
+  </url>
+  <url>
     <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_8.html</loc>
     <lastmod>2026-04-14T18:17:06.505Z</lastmod>
   </url>
   <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/storage_3.html</loc>
-    <lastmod>2026-03-28T19:07:17.471Z</lastmod>
+    <loc>https://umddb.github.io/cmsc424-spring2026/transactions_1.html</loc>
+    <lastmod>2026-05-01T13:06:25.950Z</lastmod>
   </url>
   <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/storage_1.html</loc>
-    <lastmod>2026-03-28T19:07:17.469Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/index.html</loc>
-    <lastmod>2026-04-14T21:34:33.872Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_3.html</loc>
-    <lastmod>2026-04-14T00:56:14.208Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_4.html</loc>
-    <lastmod>2026-04-14T02:18:48.048Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_7.html</loc>
-    <lastmod>2026-04-14T18:10:31.421Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_6.html</loc>
-    <lastmod>2026-04-14T17:56:34.257Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_5.html</loc>
-    <lastmod>2026-04-14T13:43:23.747Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_1.html</loc>
-    <lastmod>2026-03-31T15:38:11.210Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_2.html</loc>
-    <lastmod>2026-03-31T15:40:18.327Z</lastmod>
-  </url>
-  <url>
-    <loc>https://umddb.github.io/cmsc424-spring2026/about.html</loc>
-    <lastmod>2026-03-28T19:07:17.464Z</lastmod>
+    <loc>https://umddb.github.io/cmsc424-spring2026/transactions_6.html</loc>
+    <lastmod>2026-05-01T14:45:47.787Z</lastmod>
   </url>
   <url>
     <loc>https://umddb.github.io/cmsc424-spring2026/storage_2.html</loc>
     <lastmod>2026-03-28T20:18:34.089Z</lastmod>
   </url>
   <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/about.html</loc>
+    <lastmod>2026-03-28T19:07:17.464Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_2.html</loc>
+    <lastmod>2026-03-31T15:40:18.327Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_1.html</loc>
+    <lastmod>2026-03-31T15:38:11.210Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_5.html</loc>
+    <lastmod>2026-04-14T13:43:23.747Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_6.html</loc>
+    <lastmod>2026-04-14T17:56:34.257Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_7.html</loc>
+    <lastmod>2026-04-14T18:10:31.421Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_4.html</loc>
+    <lastmod>2026-04-14T02:18:48.048Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_3.html</loc>
+    <lastmod>2026-04-14T00:56:14.208Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/index.html</loc>
+    <lastmod>2026-05-01T14:45:57.694Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/storage_1.html</loc>
+    <lastmod>2026-03-28T19:07:17.469Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/storage_3.html</loc>
+    <lastmod>2026-03-28T19:07:17.471Z</lastmod>
+  </url>
+  <url>
     <loc>https://umddb.github.io/cmsc424-spring2026/query_processing_9.html</loc>
     <lastmod>2026-04-14T18:25:52.578Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/transactions_4_5.html</loc>
+    <lastmod>2026-05-01T14:36:39.895Z</lastmod>
+  </url>
+  <url>
+    <loc>https://umddb.github.io/cmsc424-spring2026/transactions_2.html</loc>
+    <lastmod>2026-05-01T13:12:21.055Z</lastmod>
   </url>
 </urlset>
