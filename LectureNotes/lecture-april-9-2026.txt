@@ -1,0 +1,462 @@
+100%|█████████████████████████████████████| 1.42G/1.42G [00:23<00:00, 65.9MiB/s]
+Detecting language using up to the first 30 seconds. Use `--language` to specify the language
+Detected language: English
+[00:00.000 --> 00:18.080]  All right, why don't we get started?
+[00:18.080 --> 00:24.780]  So we've been talking about query optimization in the last couple of classes.
+[00:24.780 --> 00:34.700]  So once again, the goal of query optimization is to generate a query evaluation plan, something
+[00:34.700 --> 00:35.700]  of this form.
+[00:35.700 --> 00:38.260]  It doesn't have to look like this, but something like this.
+[00:38.260 --> 00:46.300]  It's usually a tree of operators with annotated operations that tell the query executor what
+[00:46.300 --> 00:47.300]  exactly to do.
+[00:47.300 --> 00:50.300]  And so typically, it tends to have a lot more annotation than this.
+[00:50.820 --> 00:57.140]  For a merge join, it might specify some number of the sizes of the runs to create.
+[00:57.140 --> 01:02.860]  For a hash join, it might have some parameters like the number of buckets and things like
+[01:02.860 --> 01:03.860]  that.
+[01:03.860 --> 01:09.340]  And there is, of course, a lot of optimization that goes on within each operator itself.
+[01:09.340 --> 01:15.560]  But right now, we are more focused on the overall order of operators and which operators
+[01:15.560 --> 01:19.060]  to use and so on.
+[01:19.060 --> 01:27.060]  So roughly speaking, the way we think about this problem is we split it into three or
+[01:27.060 --> 01:28.060]  four parts.
+[01:28.060 --> 01:29.060]  One is equivalent of expressions.
+[01:29.060 --> 01:34.500]  We need to be able to tell what two expressions are equivalent.
+[01:34.500 --> 01:40.340]  Like we saw examples last time, be able to say that this query plan produces exactly
+[01:40.340 --> 01:43.820]  the same result as this query plan under the database constraints.
+[01:44.580 --> 01:49.300]  And again, it's important that this is not true just for the current instance, but for
+[01:49.300 --> 01:51.300]  any possible instance.
+[01:51.300 --> 01:56.340]  Because this plan might be correct for one database, but if I add another tuple, if the
+[01:56.340 --> 01:59.340]  results change for these two query plans, well, that's a problem.
+[01:59.340 --> 02:02.340]  These two plans need to be equivalent.
+[02:02.340 --> 02:07.100]  And so the typical way we do equivalence, as we covered in the last class, is kind of
+[02:07.100 --> 02:09.340]  do it at the level of operators.
+[02:09.340 --> 02:16.660]  So we have a bunch of rules in the query as part of query optimizer that allow transforming
+[02:16.660 --> 02:20.460]  a tree of this form into a tree of this form.
+[02:20.460 --> 02:24.300]  So this one is essentially a joint commutativity and associativity.
+[02:24.300 --> 02:30.780]  It says that joining E1 and E2 first followed by E3 is same as joining E2 and E3 first followed
+[02:30.780 --> 02:32.980]  by E1 and so on.
+[02:32.980 --> 02:34.900]  So we have a whole bunch of rules like this.
+[02:34.900 --> 02:43.700]  A typical database might have hundreds of rules like this that allow transforming the,
+[02:43.700 --> 02:48.380]  let's say, this is the original query plan we started with, allows transforming this
+[02:48.380 --> 02:51.500]  into all possible alternative plans.
+[02:51.500 --> 02:56.100]  And once we have these equivalence rules, assuming they are complete, it gives us a
+[02:56.100 --> 03:01.580]  path to do query optimization, which is to take each one of those alternative plans that
+[03:01.580 --> 03:05.660]  are equivalent and figure out which one is the best.
+[03:05.660 --> 03:12.020]  So that's kind of the first step in understanding query optimization, is that the first thing
+[03:12.020 --> 03:16.820]  we need to understand is how to decide if two query plans are equivalent, and that's
+[03:16.820 --> 03:19.580]  what we covered in the last class.
+[03:19.580 --> 03:24.980]  Then the second step is, given a query plan, a specific query plan, how do I estimate its
+[03:24.980 --> 03:25.980]  cost?
+[03:25.980 --> 03:30.940]  And as part of that, we need to be able to estimate the sizes of the results.
+[03:30.940 --> 03:37.260]  For instance, going back to the same query plan, in order to evaluate the cost of this
+[03:37.260 --> 03:43.340]  query plan, I will be effectively, the simplest way to do it is to evaluate the cost of each
+[03:43.340 --> 03:46.180]  of the operators and just add them up.
+[03:46.180 --> 03:50.660]  It's a little bit simplistic because modern processes are more complicated.
+[03:50.660 --> 03:55.900]  You can do parallelism, you have multiple codes, but still, you know, as a simple heuristic,
+[03:55.900 --> 03:57.860]  it works out pretty okay.
+[03:57.860 --> 04:02.700]  So every operator, we compute its cost and we just add it up.
+[04:02.700 --> 04:05.300]  We already know how to compute the costs of the operators.
+[04:05.300 --> 04:09.660]  We talked about it when we discussed operator implementations.
+[04:09.660 --> 04:15.420]  So the one important piece that's missing is we need to be able to say, let's say this
+[04:15.420 --> 04:19.820]  sort operator, what is the input size for this?
+[04:19.820 --> 04:24.020]  Because in order to calculate the cost of this sort operator, I need to know how much
+[04:24.020 --> 04:26.300]  data we need to sort.
+[04:26.300 --> 04:31.900]  And the problem with this sort operator is that, in this plan, is that input to that
+[04:31.900 --> 04:39.700]  is a expression itself, input to that is a result.
+[04:39.700 --> 04:44.300]  So in effect, what I need to do is I need to be able to compute the size, estimate the
+[04:44.300 --> 04:47.820]  size of this result.
+[04:47.820 --> 04:52.900]  Once I estimate that size, that allows me to estimate the cost of this sort.
+[04:53.100 --> 04:59.100]  Similarly, I need to estimate the number of tuples in instructor that satisfy department
+[04:59.100 --> 05:04.900]  equal to music, I can use that to compute the cost for sort and then use it to compute
+[05:04.900 --> 05:08.300]  the cost for the merge join and so on.
+[05:08.300 --> 05:11.900]  So hopefully, we have figured out each of the individual pieces.
+[05:11.900 --> 05:16.100]  We have a little bit remaining here about computing the result size of, estimating
+[05:16.100 --> 05:20.100]  the result size of a join.
+[05:20.100 --> 05:23.300]  Once we have done this, hopefully the first two steps are clear.
+[05:23.300 --> 05:28.100]  The step being equivalent expressions and the costing part.
+[05:28.100 --> 05:32.500]  And then the last remaining piece will be the optimization algorithm itself.
+[05:37.500 --> 05:38.500]  Let me pause here for a second.
+[05:38.500 --> 05:41.900]  Any questions on these things that I just covered?
+[05:41.900 --> 05:44.900]  The review of the material so far?
+[05:44.900 --> 05:46.100]  Is this all clear?
+[05:50.100 --> 05:51.100]  Okay.
+[05:53.100 --> 06:00.100]  Then the one question for us is, for a join, how do I estimate the size of the result?
+[06:02.100 --> 06:05.100]  And that's kind of, we have a couple of slides on that.
+[06:05.100 --> 06:08.100]  So we'll cover that and then we'll move on to the search algorithms.
+[06:11.100 --> 06:18.100]  So let me try to do this paper so we can work through it step by step.
+[06:21.100 --> 06:27.100]  So again, remember the main principle that we have here is that we have some statistics
+[06:27.100 --> 06:35.100]  on relations and then we make assumptions where those statistics are not sufficient, right?
+[06:35.100 --> 06:38.100]  So let me take an example here.
+[06:39.100 --> 06:41.100]  This is step camera two.
+[06:47.100 --> 06:49.100]  Let's take an example of a...
+[06:58.100 --> 07:02.100]  Let's take a relation R, join S on A.
+[07:02.100 --> 07:03.100]  Okay.
+[07:05.100 --> 07:09.100]  And let's say we have, and so this is a, or let's make it B, it's easier.
+[07:09.100 --> 07:17.100]  Let's say R is AB and we know that the number of distinct values of B, I think...
+[07:17.100 --> 07:19.100]  What do we call that?
+[07:19.100 --> 07:29.100]  I just want to make sure V A comma R.
+[07:29.100 --> 07:34.100]  V A comma R, let's say is 100.
+[07:35.100 --> 07:40.100]  Size of R is, let's say, 1000.
+[07:45.100 --> 07:47.100]  Sorry, this is B.
+[07:47.100 --> 07:49.100]  And I'll explain this.
+[07:49.100 --> 07:50.100]  Okay.
+[08:01.100 --> 08:02.100]  Okay.
+[08:02.100 --> 08:05.100]  So let's say this is the information that we know right now.
+[08:05.100 --> 08:06.100]  Okay.
+[08:06.100 --> 08:10.100]  Again, the reason that I'm working this out is because the formula, once I present the
+[08:10.100 --> 08:12.100]  formulas, students focus on the formula.
+[08:12.100 --> 08:14.100]  The formula is really not that important.
+[08:14.100 --> 08:18.100]  If you understand how we derive the formula, that's a lot easier to understand than actually
+[08:18.100 --> 08:20.100]  remembering the formula.
+[08:20.100 --> 08:23.100]  So let's say we're doing a join of B.
+[08:23.100 --> 08:24.100]  Okay.
+[08:24.100 --> 08:32.100]  The V, capital V, B comma R, represents the number of distinct values of B in R.
+[08:32.100 --> 08:33.100]  Okay.
+[08:33.100 --> 08:36.100]  So this is a number of distinct values.
+[08:36.100 --> 08:39.100]  Distinct values.
+[08:39.100 --> 08:42.100]  Size of R is 1000.
+[08:42.100 --> 08:48.100]  For V, the V is actually not particularly useful for B because we know that B is a primary
+[08:48.100 --> 08:49.100]  key.
+[08:49.100 --> 08:55.100]  Now the question is, what is the size of R join S?
+[09:01.100 --> 09:03.100]  Anyone want to hazard a guess on that?
+[09:03.100 --> 09:05.100]  What should be the size of R join S?
+[09:06.100 --> 09:14.100]  It's like the simplest possible case for joint result estimation under these assumptions.
+[09:17.100 --> 09:22.100]  So remember the main assumption here is actually going to be that the B is a primary key.
+[09:26.100 --> 09:28.100]  Anyone?
+[09:29.100 --> 09:37.100]  So the way you can often think about these estimations is to think about a tuple in R
+[09:37.100 --> 09:41.100]  and try to estimate the number of matches in the other relation.
+[09:41.100 --> 09:42.100]  Okay.
+[09:42.100 --> 09:49.100]  So take a tuple in R and ask, how many matches do I have on average for that tuple?
+[09:49.100 --> 09:50.100]  Okay.
+[09:50.100 --> 10:03.100]  So in effect, this is same as size of R times number of matches on average in S.
+[10:03.100 --> 10:05.100]  And I can flip it also.
+[10:05.100 --> 10:06.100]  Both ways works.
+[10:06.100 --> 10:07.100]  Okay.
+[10:07.100 --> 10:10.100]  So this is often easier to estimate.
+[10:10.100 --> 10:15.100]  The number of matches on average in S for a given tuple of R.
+[10:15.100 --> 10:20.100]  So in this case, given a tuple of R, how many matches do we expect in S?
+[10:23.100 --> 10:24.100]  No one?
+[10:28.100 --> 10:34.100]  So if I look at a tuple in R, that tuple is going to be of the form A1, B1.
+[10:34.100 --> 10:35.100]  Okay.
+[10:35.100 --> 10:41.100]  So the number of matches in S is the number of tuples in S with B equal to B1.
+[10:41.100 --> 10:42.100]  Okay.
+[10:42.100 --> 10:50.100]  Now, B is a primary key for S, which means that there can be at most one tuple with B equal to B1 in S.
+[10:50.100 --> 10:51.100]  Okay.
+[10:51.100 --> 10:52.100]  Otherwise, it cannot be a primary key.
+[10:52.100 --> 10:59.100]  The definition of primary key is that B is not duplicated in S, which means that for any tuple in R,
+[10:59.100 --> 11:02.100]  I have at most one match in S.
+[11:02.100 --> 11:03.100]  Okay.
+[11:03.100 --> 11:10.100]  And as a result of it, this size is simply 1,000 times 1 equal to 1,000.
+[11:10.100 --> 11:11.100]  Okay.
+[11:11.100 --> 11:18.100]  So if B is a primary key, the size of the result is just the size of the left-hand side.
+[11:23.100 --> 11:24.100]  Any questions?
+[11:24.100 --> 11:25.100]  Does this make sense?
+[11:25.100 --> 11:26.100]  Any questions?
+[11:33.100 --> 11:34.100]  Are you good to move on?
+[11:36.100 --> 11:37.100]  Okay.
+[11:37.100 --> 11:43.100]  Well, the next one is going to be slightly harder.
+[11:43.100 --> 11:50.100]  So we will do V, B, R equal to 100 still.
+[11:50.100 --> 11:54.100]  Size of R is still 1,000.
+[11:54.100 --> 11:57.100]  B, S will be 250.
+[11:57.100 --> 12:00.100]  So we have two very distinct values.
+[12:08.100 --> 12:16.100]  So in this case, S is no longer a primary key in, sorry, B is no longer a primary key in S
+[12:16.100 --> 12:21.100]  because we have 250 distinct values and total number of tuples is 500.
+[12:21.100 --> 12:24.100]  In this case, what should the answer be?
+[12:24.100 --> 12:25.100]  Okay.
+[12:25.100 --> 12:37.100]  So again, going by the same formula, we need to do 1,000 times number of matches on average.
+[12:40.100 --> 12:42.100]  Anyone want to try to guess this one?
+[12:42.100 --> 12:57.100]  So in this case, for a given tuple in R, let's say A1, B1, let's say B1, B1 is the B value,
+[12:57.100 --> 13:09.100]  we expect, on average we expect two matches because every value of B is on average appears twice in S.
+[13:09.100 --> 13:12.100]  So this tuple will join two tuples in S.
+[13:12.100 --> 13:13.100]  Okay.
+[13:13.100 --> 13:21.100]  So we get 1,000 times 2 equal to 2,000.
+[13:21.100 --> 13:27.100]  So the answer here, estimated result size here would be 2,000.
+[13:39.100 --> 13:43.100]  If you didn't follow it, you can ask your questions, otherwise we'll move on.
+[13:50.100 --> 13:58.100]  So I'm trying to estimate that given a tuple, any tuple in R, let's say A1, B1, this is variables,
+[13:58.100 --> 14:02.100]  how many matches do I have in S for B1?
+[14:03.100 --> 14:08.100]  Since there are 250 distinct values of B in S, size of S is 500,
+[14:08.100 --> 14:12.100]  any specific value of B on average appears twice.
+[14:12.100 --> 14:16.100]  And that's where I get the tuple.
+[14:16.100 --> 14:21.100]  And this formula can be generalized, which is what we have in the slides,
+[14:21.100 --> 14:30.100]  to give us, you know, a more general expression for any two relations.
+[14:30.100 --> 14:32.100]  Okay.
+[14:32.100 --> 14:35.100]  And we have not discussed how to make that better using histograms,
+[14:35.100 --> 14:41.100]  but histograms, if you have available, can be used to make it better.
+[14:41.100 --> 14:46.100]  This is going through exactly the same example that we just went through.
+[14:46.100 --> 14:51.100]  R join S, size of R is 10,000, size of S is 500, 5,000.
+[14:51.100 --> 14:55.100]  If A is a T for S, then the size is exactly the size of R.
+[14:55.100 --> 15:01.100]  Because every tuple in R matches with exactly one tuple in S.
+[15:01.100 --> 15:07.100]  And this is assuming referential integrity, which is almost always true.
+[15:07.100 --> 15:13.100]  So we don't have a tuple in R with a value of A that doesn't exist in S.
+[15:13.100 --> 15:18.100]  That's a violation of referential integrity, and that's usually not the case.
+[15:18.100 --> 15:22.100]  If there is a selection on R or S, we can kind of adjust it accordingly.
+[15:22.100 --> 15:26.100]  So the way we handle it is, for instance, let's say we have a predicate on S,
+[15:26.100 --> 15:30.100]  say S dot B equal to 100, and that has a selectivity of 0.1.
+[15:30.100 --> 15:34.100]  So it selects 10% of the tuples from S.
+[15:34.100 --> 15:39.100]  In a joint result, we simply take the, without the selection,
+[15:39.100 --> 15:41.100]  and just multiply that with 0.1.
+[15:41.100 --> 15:44.100]  This has issues, like this assumes independence of some form,
+[15:44.100 --> 15:47.100]  but that's the formula that most databases use.
+[15:47.100 --> 15:52.100]  At least most, at least a database like PostgreSQL uses basically a formula like that.
+[15:52.100 --> 15:56.100]  You just multiply the probabilities.
+[15:56.100 --> 16:01.100]  If A is a key for R, you get similar sort of expression.
+[16:01.100 --> 16:05.100]  And if A is not a key for either, then I won't go through these slides,
+[16:05.100 --> 16:08.100]  but this is working through the same example that I,
+[16:08.100 --> 16:12.100]  same sort of exercise that we went through.
+[16:12.100 --> 16:20.100]  So what it assumes is that we, the number of extreme values is 100,
+[16:20.100 --> 16:23.100]  then there are 100 tuples of R with that value,
+[16:23.100 --> 16:27.100]  50 tuples of S with that value, and they all join with each other.
+[16:27.100 --> 16:30.100]  So we end up with something like 500,000 tuples.
+[16:30.100 --> 16:34.100]  So even though we started with 10,500 tuples, 5,000 tuples,
+[16:34.100 --> 16:37.100]  our result here has 500,000 tuples.
+[16:37.100 --> 16:40.100]  And that happens because we are joining on an attribute
+[16:40.100 --> 16:45.100]  that's sort of frequent in both relations.
+[16:45.100 --> 16:49.100]  And because of that, you get this multiplicative effect.
+[16:49.100 --> 16:55.100]  Generally speaking, these types of joins are not common in databases,
+[16:55.100 --> 16:57.100]  but they do occur.
+[16:57.100 --> 17:04.100]  So they're not super common, but they are not uncommon either.
+[17:04.100 --> 17:09.100]  That was the last thing I wanted to discuss for cardinality estimation,
+[17:09.100 --> 17:12.100]  unless there are questions on that.
+[17:12.100 --> 17:15.100]  Otherwise we'll move on to the search part,
+[17:15.100 --> 17:17.100]  which I know we have like six, seven slides,
+[17:17.100 --> 17:20.100]  but it'll take us some time to go through them.
+[17:20.100 --> 17:26.100]  And then we'll move on to the next topic.
+[17:26.100 --> 17:37.100]  So the sort of things we have learned so far allow us to find the best plan
+[17:37.100 --> 17:39.100]  through this process.
+[17:39.100 --> 17:44.100]  Basically the process would be to generate all possible execution plans,
+[17:44.100 --> 17:48.100]  including the annotations like the which operators and so on,
+[17:48.100 --> 17:52.100]  figure out the cost for each one of them, and then find the best one.
+[17:52.100 --> 17:57.100]  The problem with this is that the number of plans like this is way too large,
+[17:57.100 --> 17:59.100]  so we can't really do this.
+[17:59.100 --> 18:03.100]  In fact, the earliest databases did not even have a proper optimizer.
+[18:03.100 --> 18:05.100]  They just had some heuristics.
+[18:05.100 --> 18:14.100]  The kinds of heuristics they used were things like this.
+[18:14.100 --> 18:17.100]  You perform selections as early as possible,
+[18:17.100 --> 18:19.100]  because this reduces the number of tuples.
+[18:19.100 --> 18:22.100]  You perform projections as early as possible,
+[18:22.100 --> 18:24.100]  because it reduces the number of attributes.
+[18:24.100 --> 18:26.100]  These are kind of more standard.
+[18:26.100 --> 18:32.100]  Then one of the common rules was that you perform the join or selection
+[18:32.100 --> 18:36.100]  that is the most restrictive before other operations.
+[18:36.100 --> 18:39.100]  So if I have a sequence of joins to do,
+[18:39.100 --> 18:46.100]  I'll do the join that is estimated to produce fewest tuples first.
+[18:47.100 --> 18:49.100]  It turns out it's not a very good heuristic,
+[18:49.100 --> 18:52.100]  but it was a heuristic that earlier systems used.
+[18:52.100 --> 18:56.100]  MongoDB, when it was built and then for almost 10 years,
+[18:56.100 --> 18:58.100]  did not really have an optimizer.
+[18:58.100 --> 19:01.100]  They did not have a proper optimizer.
+[19:01.100 --> 19:03.100]  They had an optimizer that did things like this.
+[19:03.100 --> 19:08.100]  Spark, again for about 10ish years, did not have a query optimizer.
+[19:08.100 --> 19:11.100]  And then, not 10 years, maybe 8 years.
+[19:11.100 --> 19:17.100]  I think 2011, 2019 or so, they added a proper query optimizer.
+[19:17.100 --> 19:21.100]  So eventually, many of these systems move towards a proper query optimizer,
+[19:21.100 --> 19:26.100]  but the simpler things are to do heuristics.
+[19:26.100 --> 19:29.100]  So what does the exhaustive search actually look like?
+[19:29.100 --> 19:31.100]  It's honestly not that complicated,
+[19:31.100 --> 19:36.100]  but it does depend on how much you are comfortable with dynamic programming.
+[19:37.100 --> 19:44.100]  So this is roughly how dynamic programming algorithm works.
+[19:44.100 --> 19:48.100]  I won't go through, I'll try to go through the steps in here,
+[19:48.100 --> 19:55.100]  but I can also draw some things out if that helps.
+[19:58.100 --> 20:01.100]  So this is a dynamic programming based algorithm,
+[20:01.100 --> 20:05.100]  and let's say our goal is to find the best way to join five relations,
+[20:05.100 --> 20:07.100]  R1 to R5.
+[20:07.100 --> 20:11.100]  The number of total plans for this is something like 3 to the power 5.
+[20:11.100 --> 20:17.100]  So it's a relatively large number of plans that is possible for joining five relations.
+[20:17.100 --> 20:29.100]  Dynamic programming reduces the time from something like this
+[20:29.100 --> 20:32.100]  to something like this.
+[20:32.100 --> 20:37.100]  Or rather, it reduces it from factorial to something like this.
+[20:37.100 --> 20:41.100]  So otherwise, the number of plans is more than factorial,
+[20:41.100 --> 20:44.100]  it reduces to something like exponential,
+[20:44.100 --> 20:49.100]  which is actually considered reasonable because most queries don't have too many joints.
+[20:49.100 --> 20:54.100]  But still, there exist many cases where there are more joints
+[20:54.100 --> 20:59.100]  and people are still coming up with ways to better optimize queries.
+[20:59.100 --> 21:04.100]  In database conferences, we still see papers on query optimization,
+[21:04.100 --> 21:12.100]  even though the first paper on query optimization was written about 46 years ago.
+[21:16.100 --> 21:18.100]  So how does the dynamic programming work?
+[21:18.100 --> 21:21.100]  Again, it's not particularly complicated,
+[21:21.100 --> 21:24.100]  it requires a little bit of familiarity with dynamic programming itself,
+[21:24.100 --> 21:27.100]  which I think some of you may not have yet.
+[21:27.100 --> 21:33.100]  The way it works is it builds out the query plan sort of bottom up.
+[21:33.100 --> 21:36.100]  So we have to join five relations,
+[21:36.100 --> 21:41.100]  so we put boxes for those five relations at the bottom.
+[21:41.100 --> 21:45.100]  Then what we do is we consider the best way to do pairwise join.
+[21:45.100 --> 21:49.100]  Every pair of relations, we figure out what is the best way to join them.
+[21:49.100 --> 21:52.100]  So in this case, for instance, we look at R4 and R5,
+[21:52.100 --> 21:58.100]  and we say the best way to join R4 and R5 is to use a hash join,
+[21:58.100 --> 22:01.100]  and we note down the cost being 300.
+[22:01.100 --> 22:05.100]  So we are kind of doing it for every pair of relations.
+[22:05.100 --> 22:08.100]  In fact, you can reduce this somewhat, but for now, simplicity,
+[22:08.100 --> 22:11.100]  let's assume we are doing it for every pair of relations.
+[22:11.100 --> 22:16.100]  So R1 and R2, we analyze the sizes of R1 and R2,
+[22:16.100 --> 22:20.100]  we consider the possibilities, you know, hash join, merge join, index join,
+[22:20.100 --> 22:24.100]  nested loops join, and we decide that hash join is the best option,
+[22:24.100 --> 22:27.100]  and the cost for that is 100.
+[22:27.100 --> 22:33.100]  R1 and R3, we decide that sort merge join is the best join,
+[22:33.100 --> 22:37.100]  and the cost is 300 and so on.
+[22:37.100 --> 22:42.100]  So we do this for every pair of relations, every join first,
+[22:42.100 --> 22:45.100]  using the techniques we have already discussed.
+[22:45.100 --> 22:48.100]  Then we start building on top of it, okay?
+[22:48.100 --> 22:53.100]  We ask the question, what about the three-way R1, R2, R3?
+[22:53.100 --> 22:56.100]  What is the best way to do R1, R2, R3?
+[22:56.100 --> 22:59.100]  Now here, we are not going to start from scratch.
+[22:59.100 --> 23:02.100]  We will use what we have built up here.
+[23:02.100 --> 23:06.100]  In order to join three relations, I have to join two of them first, okay?
+[23:06.100 --> 23:08.100]  Which means I have a bunch of choices.
+[23:08.100 --> 23:13.100]  What I can do is I can join R1, R2 with R3.
+[23:13.100 --> 23:17.100]  So R1, R2 with R3, okay?
+[23:17.100 --> 23:22.100]  I'm not going to consider R1 separately, R2 separately, R3 separately,
+[23:22.100 --> 23:26.100]  but I'll ask, given that I already have these estimated,
+[23:26.100 --> 23:30.100]  what is the best cost for this result?
+[23:30.100 --> 23:34.100]  So one option is join R1, R2 with R3 using hash join,
+[23:34.100 --> 23:37.100]  and let's say the cost comes out to be something.
+[23:37.100 --> 23:43.100]  So R100 is the cost of this plus whatever the cost of this second join is.
+[23:43.100 --> 23:48.100]  The other option I have is R1, R2 with R3, but using short merge join.
+[23:48.100 --> 23:50.100]  Same thing.
+[23:50.100 --> 23:52.100]  R1, R3 with R2, okay?
+[23:52.100 --> 23:57.100]  Because I have three relations and I can sort of order them in arbitrary ways,
+[23:57.100 --> 24:01.100]  I also have an option of first doing R1, R3, followed by R2.
+[24:01.100 --> 24:04.100]  So for that I will use this and R2.
+[24:04.100 --> 24:07.100]  So that way I'm joining this and R2, okay?
+[24:07.100 --> 24:09.100]  And I compute the cost for that.
+[24:09.100 --> 24:11.100]  I compute the cost for all of these options.
+[24:11.100 --> 24:13.100]  This is when the exponential comes in, okay?
+[24:13.100 --> 24:16.100]  Despite it being an optimal, an optimized algorithm,
+[24:16.100 --> 24:19.100]  it is still exponential because I'm going to be doing this
+[24:19.100 --> 24:25.100]  for all subsets of those five relations, okay?
+[24:25.100 --> 24:28.100]  Any questions so far on what we're doing?
+[24:28.100 --> 24:32.100]  Again, it's a fairly standard at this level at which we're discussing it.
+[24:32.100 --> 24:35.100]  It's a fairly standard dynamic programming because we kind of are reusing
+[24:35.100 --> 24:39.100]  these subproblems that have already been executed, evaluated,
+[24:39.100 --> 24:41.100]  and just building on top of it.
+[24:41.100 --> 24:47.100]  Any dynamic programming algorithm kind of looks like this, okay?
+[24:47.100 --> 24:50.100]  After looking at all of these options, again, I know I already have
+[24:50.100 --> 24:54.100]  the 100 cost from below or 300 from below.
+[24:54.100 --> 24:58.100]  I know how to compute the cost of this join because I know how to estimate
+[24:58.100 --> 25:02.100]  R2 and then I know how to compute the size of the, sorry,
+[25:02.100 --> 25:04.100]  the cost of the join between those two.
+[25:04.100 --> 25:06.100]  So that gives me the second part.
+[25:06.100 --> 25:09.100]  I compare all of that and I come up with the best option.
+[25:09.100 --> 25:14.100]  So the best option might be to join a short merge join
+[25:14.100 --> 25:18.100]  between R1, R2, and R2, okay?
+[25:18.100 --> 25:22.100]  Obviously the numbers are made up, but let's say that's the best option,
+[25:22.100 --> 25:25.100]  and the cost for the best option was 400.
+[25:25.100 --> 25:30.100]  This includes the 100 here plus the short merge join cost.
+[25:30.100 --> 25:33.100]  So that's what gives me 400, okay?
+[25:33.100 --> 25:38.100]  And I do this for every three set of relations,
+[25:38.100 --> 25:44.100]  R1, R2, R3, R1, R2, R4, R1, R2, R5, and so on, okay?
+[25:44.100 --> 25:50.100]  Then I build up the next one, R1, R2, R3, R4, and in this case,
+[25:50.100 --> 25:59.100]  let's say that one showed up to be a hash join between this and R4, okay?
+[25:59.100 --> 26:06.100]  And then I get the last one, which turns out I don't actually use this at all.
+[26:06.100 --> 26:11.100]  I do a join between this and this.
+[26:11.100 --> 26:13.100]  That's also an allowed option.
+[26:13.100 --> 26:16.100]  I can take the R1, R2, R3 result,
+[26:16.100 --> 26:19.100]  join it with the R4, R5 result to get my full join,
+[26:19.100 --> 26:25.100]  and that is the best option that, let's say, showed up during this process.
+[26:25.100 --> 26:26.100]  And at this point, I'm done.
+[26:26.100 --> 26:31.100]  I've found the best way to execute the query plan is to, at the top,
+[26:31.100 --> 26:34.100]  I will have a hash join between these two.
+[26:34.100 --> 26:37.100]  This one itself is executed using a short merge join.
+[26:37.100 --> 26:40.100]  This one is executed using a hash join,
+[26:40.100 --> 26:43.100]  and so I have the full query plan at this point, okay?
+[26:43.100 --> 26:46.100]  And again, this is an exponential time algorithm.
+[26:46.100 --> 26:49.100]  So this is what the resultant query plan looks like.
+[26:49.100 --> 26:54.100]  I have a hash join between R4 and R5, hash join between R1 and R2,
+[26:54.100 --> 26:59.100]  that came from here, short merge join from here,
+[26:59.100 --> 27:03.100]  and a hash join at the top, okay?
+[27:03.100 --> 27:07.100]  And this is sort of a very general algorithm.
+[27:07.100 --> 27:11.100]  It works for almost all situations, actually all situations,
+[27:11.100 --> 27:18.100]  and helps you find the best query plan, okay?
+[27:18.100 --> 27:22.100]  Let me pause here. Any questions? Okay.
+[27:22.100 --> 27:25.100]  And by the way, you might wonder, where are the equivalence rules in this?
+[27:25.100 --> 27:30.100]  The equivalence rules are applied when I'm doing these things here, right?
+[27:30.100 --> 27:40.100]  For instance, for instance, if these were like outer joints instead,
+[27:40.100 --> 27:45.100]  you know, like I have to do an outer joint sequence,
+[27:45.100 --> 27:48.100]  then some of these options will not be valid anymore.
+[27:48.100 --> 27:53.100]  Some of these options will not be valid because they are not equivalent.
+[27:53.100 --> 27:59.100]  So the equivalence rules are applied when I'm enumerating the options for R1, R2, R3.
+[27:59.100 --> 28:04.100]  That's where the equivalence rules come into play.
+[28:04.100 --> 28:09.100]  All right. Any questions? Go ahead.
+[28:09.100 --> 28:14.100]  Can you re-explain how and how what type of joints you use at each level?
+[28:14.100 --> 28:21.100]  Like is it just, like in that first level when you're doing the joint between R1, R2, R30,
+[28:21.100 --> 28:30.100]  you do a sort merge join just because in the first level it's like R1 and R3 join is the most important list?
+[28:30.100 --> 28:32.100]  No, I did compare both options.
+[28:32.100 --> 28:35.100]  I compared the option of using a hash join and sort merge join,
+[28:35.100 --> 28:37.100]  and in sort merge join turned out to be better.
+[28:37.100 --> 28:43.100]  So there is no like easy heuristic to just like know which one is better based on the local code for it?
+[28:43.100 --> 28:50.100]  So the way I would put it is that this is not a particularly expensive algorithm to run in most cases.
+[28:50.100 --> 28:52.100]  So there isn't a very good reason to use heuristics,
+[28:52.100 --> 28:59.100]  but there are ways to short circuit this a bit and reduce the amount of exploration you do.
+[28:59.100 --> 29:03.100]  One thing I did not discuss here, for instance, is a very simple explanation.
+[29:03.100 --> 29:09.100]  What if the joint, R1 joins with R2, there is a condition R1.A equal to R2.A,
+[29:09.100 --> 29:12.100]  but there is no condition between R1 and R4.
+[29:12.100 --> 29:16.100]  In that case, this becomes a Cartesian product.
+[29:16.100 --> 29:19.100]  If there is no condition between them, it's a Cartesian product.
+[29:19.100 --> 29:21.100]  There is no reason to even consider that.
+[29:21.100 --> 29:23.100]  The Cartesian products are bad.
+[29:23.100 --> 29:28.100]  So you can short circuit this, but even, that's a very simple one,
+[29:28.100 --> 29:31.100]  but even otherwise there are other short circuits you can do.
+[29:31.100 --> 29:36.100]  But if you go to PostgreSQL codebase, this is the algorithm that I just described.
+[29:36.100 --> 29:39.100]  That's the algorithm they have.
+[29:39.100 --> 29:41.100]  SQL Server doesn't have this algorithm.
+[29:41.100 --> 29:46.100]  SQL Server has a version of this algorithm that's top-down.
+[29:46.100 --> 29:56.100]  It actually, SQL Server matches in some ways what we discussed here.
+[29:56.100 --> 30:05.100]  SQL Server's codebase, the optimizer, starts with a complete plan and keeps transforming it.
+[30:05.100 --> 30:09.100]  It's more of what's called a top-down algorithm.
+[30:09.100 --> 30:12.100]  One major benefit it has is that there is always a plan ready.
+[30:12.100 --> 30:16.100]  So you can stop the optimization at any point and pick the best plan.
+[30:16.100 --> 30:19.100]  Whereas in the bottom-up algorithm that we just saw,
+[30:19.100 --> 30:24.100]  we kind of have to wait for the whole algorithm to finish before we have a query plan.
+[30:24.100 --> 30:28.100]  So it's a good question that you asked, but it doesn't have a very simple answer.
+[30:28.100 --> 30:37.100]  There is many variations of this algorithm, and some of them take some shortcuts.
+[30:37.100 --> 30:42.100]  IBM DB2's query optimizer, so IBM is one of the earliest relational databases.
+[30:42.100 --> 30:45.100]  They had the most matured query optimizer.
+[30:45.100 --> 30:53.100]  Their query optimizer in 2000s had nine different levels of optimization.
+[30:53.100 --> 30:58.100]  So just like in GCC, you can specify flags, minus 03, 04, and so on.
+[30:58.100 --> 31:04.100]  IBM query optimizer allowed you to specify how much you wanted to optimize the query.
+[31:04.100 --> 31:10.100]  It would pick something really simple if you picked level one,
+[31:10.100 --> 31:16.100]  and it would spend as much time as it can if you picked level nine to find the best plan.
+[31:16.100 --> 31:21.100]  I don't know all the nine levels it had. I don't know what those levels were.
+[31:23.100 --> 31:25.100]  Any other questions?
+[31:25.100 --> 31:28.100]  This was more or less the last slide I had on this topic.
+[31:28.100 --> 31:33.100]  I had a couple simple slides after this.
+[31:33.100 --> 31:41.100]  Query optimizers are very complex pieces of code, and the thing is that they do matter.
+[31:41.100 --> 31:45.100]  A lot of people might say, why are we spending so much effort in figuring query optimizers out?
+[31:45.100 --> 31:48.100]  They make a significant difference.
+[31:48.100 --> 31:54.100]  The kinds of things that make a bigger difference, as much as query optimizer, are also the estimations.
+[31:54.100 --> 31:58.100]  The estimations that we talked about earlier, it's easy to get them wrong.
+[31:58.100 --> 32:02.100]  We saw some examples with that mod function, for instance.
+[32:02.100 --> 32:06.100]  Postgresql just made up a number in that case.
+[32:06.100 --> 32:12.100]  Those matter even more in some ways than the optimization algorithm itself.
+[32:12.100 --> 32:17.100]  Because if you get that wrong, you are very likely to pick a bad query plan.
+[32:17.100 --> 32:23.100]  And bad query plans can be significantly worse than good query plans, like by orders of magnitude.
+[32:23.100 --> 32:28.100]  By a factor of 10, 100, not uncommon.
+[32:28.100 --> 32:37.100]  People at IBM DB2 back then used to have to go to customer sites to fix their query optimization problems.
+[32:37.100 --> 32:43.100]  Because when a customer comes and says, my query is not running fast enough, someone has to go and fix it.
+[32:43.100 --> 32:48.100]  They used to talk about some pretty complex cases that they had to deal with.
+[32:52.100 --> 32:55.100]  One quick note I'll make.
+[32:55.100 --> 33:02.100]  If you ever read deeper on this thing, you will hear the words that are called left deep and right deep query plans.
+[33:02.100 --> 33:06.100]  This is a tradition called a left deep query plan.
+[33:06.100 --> 33:15.100]  What it means is that for every join, one input, typically the right input, is a relation.
+[33:15.100 --> 33:22.100]  So these plans are somewhat simpler, and many systems only consider these types of plans.
+[33:22.100 --> 33:25.100]  This is what's often called a bushy plan.
+[33:25.100 --> 33:33.100]  In this case, as with the previous example we saw also, for this join, both its inputs are joins themselves.
+[33:34.100 --> 33:41.100]  So these are a little bit more complex, and many modern systems only consider the left deep plans.
+[33:45.100 --> 33:54.100]  And again, one simplest way to simplify or one easiest way to simplify query optimizer is to avoid things like dynamic programming and just use heuristics.
+[33:54.100 --> 34:00.100]  So a lot of data systems early on use heuristics.
+[34:01.100 --> 34:10.100]  And then Oracle famously only used heuristics for a long time before finally switching to a proper query optimizer in the 90s or late 90s.
+[34:10.100 --> 34:21.100]  Oracle started in mid 80s, became very popular because they had a better fit for many domains from a hardware perspective.
+[34:21.100 --> 34:28.100]  And they, for the longest time, had a somewhat simplistic optimizer.
+[34:28.100 --> 34:31.100]  But eventually they also switched to a proper optimizer.
+[34:34.100 --> 34:42.100]  Alright, to summarize, query optimization is key and tends to be pretty complex.
+[34:42.100 --> 34:46.100]  It's a very active area of research, for instance things like MongoDB.
+[34:46.100 --> 34:55.100]  MongoDB does not have a great query optimizer yet, and they work on things like that.
+[34:55.100 --> 34:57.100]  A bunch of work on statistics.
+[34:59.100 --> 35:05.100]  In this space also there has been some interesting work, although somewhat academic, on using AI techniques for doing this better.
+[35:06.100 --> 35:08.100]  And those have seen adoption in practice.
+[35:08.100 --> 35:16.100]  So some of the bigger database companies, the modern database companies have started using AI tools to do some of these things.
+[35:18.100 --> 35:22.100]  But that's mostly research, not really very practical.
+[35:23.100 --> 35:27.100]  To my knowledge, it hasn't been very effective in practice.
+[35:30.100 --> 35:33.100]  So before we move on, any questions on any of this?
+[35:37.100 --> 35:43.100]  What level are we expected to know, I guess, of the dynamic programming?
+[35:43.100 --> 35:44.100]  Not really.
+[35:46.100 --> 35:49.100]  Again, I haven't released the homework yet, but focus on the homework.
+[35:50.100 --> 35:57.100]  I'm not expecting you to understand or be able to read about the dynamic programming for this class.
+[35:58.100 --> 36:06.100]  If you were to take 7.24, the advanced course I'm actually offering in fall, there we would go into this in much more detail.

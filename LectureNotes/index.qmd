@@ -1,0 +1,34 @@
+---
+title: "Lecture Notes for CMSC 424, Section 201, Spring 2026"
+---
+
+This contains a partial set of lecture notes, that were created automatically using the slides and audio transcripts, using AI tools (mostly Claude Code).
+
+NOTE: I have not had a chance to carefully review the notes, which means there might errors or hallucinations. Also, the notes are not guaranteed to be complete and might be
+missing things that were covered in class.
+
+### Storage and Indexes
+
+- [Computing and Storage Hardware](storage_1.qmd) — The storage hierarchy, access time orders of magnitude, CPUs and caches, hard disks, SSDs, and how hardware characteristics shape database system design.
+- [File Organization](storage_2.qmd) — How tuples are laid out within blocks (fixed-length records, slotted pages, PAX) and across blocks (heap, sequential, hashing), plus column-oriented storage and columnar file formats like Parquet.
+- [Indexes](storage_3.qmd) — B+-trees (structure, searching, insertion, deletion), log-structured merge trees, hash indexes, bitmap indexes, composite search keys, and R-trees.
+
+### Query Processing and Optimization
+
+- [Query Plans, Pipelining, and Cost](query_processing_1.qmd) — What a query plan is, logical vs physical operators, materialization vs pipelining, the iterator model (open/next/close), and how query cost is estimated.
+- [Selection and Join Implementations](query_processing_2.qmd) — Sequential scan and index-based selection, nested loops join, index nested loops join, hash join, and hash-based outer joins (left, right, full).
+- [Sort-Merge Join, Aggregation, and External Memory](query_processing_3.qmd) — Sort-merge join, group-by aggregation (hash-based and sort-based), duplicate elimination, set operations, and external memory algorithms (partitioned hash join and external sort-merge).
+- [Introduction to Query Optimization](query_processing_4.qmd) — Why optimization matters, reading EXPLAIN and EXPLAIN ANALYZE output in PostgreSQL, secondary index thresholds, and how to use PostgreSQL hint parameters to force specific query plans.
+- [Equivalence of Relational Expressions](query_processing_5.qmd) — Algebraic rewrite rules for selections, projections, and joins; selection pushdown (and when not to push); outer join restrictions; why full plan enumeration is infeasible.
+- [Cost Estimation and Statistics](query_processing_6.qmd) — Selectivity estimation for equality and range predicates, most common values, histograms (equi-width and equi-depth), and what PostgreSQL stores in pg_stats.
+- [Join Size Estimation and Optimization Algorithms](query_processing_7.qmd) — Join cardinality estimation (three cases), incorporating selections, heuristic optimization, and dynamic programming (Selinger algorithm).
+- [Parallel and Distributed Architectures](query_processing_8.qmd) — Shared-memory, shared-disk, and shared-nothing architectures; speedup and scaleup; Amdahl's Law; hash and range partitioning; data replication; failure handling.
+- [Parallel Execution of Relational Operators](query_processing_9.qmd) — Parallel sort (range-partition shuffle), parallel hash join, fragment-and-replicate join, and parallel aggregation (three scenarios based on group count and aggregate decomposability).
+
+### Transactions
+
+- [ACID Properties and Serializability](transactions_1.qmd) — What transactions are, ACID guarantees, schedules, serial vs serializable schedules, the precedence graph test for serializability.
+- [Lock-Based Concurrency Control](transactions_2.qmd) — S/X locks, the lock manager, two-phase locking (2PL), strict 2PL, deadlock detection and prevention, multi-granularity locking with intention locks.
+- [MVCC and Isolation Levels](transactions_3.qmd) — Timestamp-based ordering, optimistic concurrency control (OCC), snapshot isolation, write skew, and SQL isolation levels.
+- [Recovery: Atomicity, Durability, and Logging](transactions_4_5.qmd) — Steal vs force policies, the memory/disk model, log-based recovery, write-ahead logging, UNDO with CLRs, REDO, the recovery algorithm, and checkpointing.
+- [Distributed Transactions and Two-Phase Commit](transactions_6.qmd) — Distributed databases, data replication, quorum systems, failure modes in distributed settings, two-phase commit protocol, recovery scenarios, and connections to Paxos and blockchain consensus.

@@ -1,0 +1,527 @@
+100%|██████████████████████████████████████| 1.42G/1.42G [00:12<00:00, 126MiB/s]
+Detecting language using up to the first 30 seconds. Use `--language` to specify the language
+Detected language: English
+[00:00.000 --> 00:02.820]  Okay, so if there are no questions,
+[00:02.820 --> 00:04.260]  let's move on with the topics.
+[00:04.260 --> 00:06.300]  So for the last couple of classes,
+[00:06.300 --> 00:10.180]  we've been discussing query processing and optimization,
+[00:10.180 --> 00:12.500]  specifically query processing.
+[00:12.500 --> 00:19.180]  So we started with the discussion of query plans,
+[00:19.180 --> 00:21.900]  how to read query plans, what a query plan is.
+[00:21.900 --> 00:25.300]  We talked about pipelining versus materialization.
+[00:25.300 --> 00:29.560]  We talked about selections using indexes or
+[00:29.560 --> 00:31.880]  without using indexes in the last class.
+[00:31.880 --> 00:36.120]  And then we talked about two different ways to do joins,
+[00:36.120 --> 00:39.360]  hash joins and nested loops joins and variation,
+[00:39.360 --> 00:43.200]  which is index nested loops join in the last class.
+[00:43.200 --> 00:48.000]  We also talked about hash-based outer joins in the last class.
+[00:48.000 --> 00:51.000]  So now, the sort of plan for today
+[00:51.000 --> 00:54.160]  is to kind of wrap up on the query operator implementations.
+[00:54.160 --> 00:55.760]  So we'll talk about sort merge joins,
+[00:55.760 --> 00:57.780]  and we'll talk about a few other operators,
+[00:57.800 --> 01:03.160]  like aggregates, sorting itself, set operations.
+[01:04.960 --> 01:08.880]  And then we'll talk about what happens when you have a data set or
+[01:08.880 --> 01:12.460]  relation that's larger than the amount of memory you have, okay?
+[01:12.460 --> 01:14.660]  It's increasingly not an issue, but
+[01:14.660 --> 01:17.860]  it's still useful to know how to handle that situation.
+[01:17.860 --> 01:24.060]  It does sometimes come up when you're dealing with large databases, okay?
+[01:24.060 --> 01:29.060]  And then next class, we may or
+[01:29.060 --> 01:31.380]  may not start with query optimization after the quiz, but
+[01:31.380 --> 01:34.780]  let's say I haven't thought about what I want to do after the quiz in the next
+[01:34.780 --> 01:35.660]  class.
+[01:35.660 --> 01:39.860]  But then the next topics are query optimizations, parallel execution, and
+[01:39.860 --> 01:43.260]  then the last module, which is transactions, okay?
+[01:43.260 --> 01:44.620]  Any questions on any of this so far?
+[01:47.820 --> 01:50.940]  All right, so let's talk about sort merge join.
+[01:50.940 --> 01:54.500]  Now, where is sort merge join?
+[02:00.420 --> 02:05.500]  So remember, we talked about the sort of hash join or
+[02:05.500 --> 02:07.820]  nested loop join kind of an approach.
+[02:07.820 --> 02:13.260]  All of them effectively have outer loop, and then there is an inner loop or
+[02:13.260 --> 02:18.060]  inner code, which sort of depends on the specific technique, right?
+[02:18.060 --> 02:20.980]  So, that's not the right way to look at it.
+[02:28.300 --> 02:30.100]  So something like this, right?
+[02:31.140 --> 02:36.500]  We go through one tuple of r, and then for every tuple,
+[02:36.500 --> 02:41.180]  we look up, either we do a scan on s, we look up an index on s, or
+[02:41.180 --> 02:43.780]  we look up into a hash table on s, okay?
+[02:43.780 --> 02:46.820]  So those are kind of three alternatives that we talked about last time,
+[02:46.820 --> 02:52.340]  which kind of have this outer loop, which goes over the tuples in one relation.
+[02:52.340 --> 02:53.940]  And then for each of that tuple,
+[02:53.940 --> 02:57.100]  it looks to find the matches in the second relation, okay,
+[02:57.100 --> 02:59.100]  in one of two, three different ways.
+[02:59.100 --> 03:01.540]  Sort merge join is a little bit different,
+[03:01.540 --> 03:05.740]  because it's a more symmetric operation, okay?
+[03:05.740 --> 03:09.380]  Now, part of the reason I cover this quickly is because you should already be
+[03:09.380 --> 03:13.500]  familiar with how to do sorting, okay, using the merge sort.
+[03:13.500 --> 03:17.260]  So sort merge join is basically merge sort, okay?
+[03:17.260 --> 03:20.340]  But you're doing a merge sort on two relations simultaneously.
+[03:21.460 --> 03:25.580]  The precondition for the sort merge join is that the relation must be sorted.
+[03:25.580 --> 03:30.460]  If they're not sorted, you need a step before that to sort them.
+[03:30.460 --> 03:36.340]  So, but for now, we're going to assume that the relations are sorted, okay?
+[03:36.340 --> 03:41.740]  And in most database systems, the sort and the merge are two separate operators.
+[03:41.740 --> 03:45.260]  Because sorting is very widely used, sorting gets used for aggregations,
+[03:45.260 --> 03:49.660]  for duplicate elimination, for set operations, it gets used for everything.
+[03:49.660 --> 03:52.380]  So we have sorting as a separate operator, and
+[03:52.380 --> 03:54.380]  then merge join as a separate operator.
+[03:57.380 --> 03:59.220]  The merge join is pretty straightforward.
+[03:59.220 --> 04:01.180]  Once the relations are sorted,
+[04:01.180 --> 04:05.780]  we effectively go down both of those relations in lockstep, right?
+[04:05.780 --> 04:08.500]  Because they are sorted on the join attribute,
+[04:08.500 --> 04:12.340]  as we're going down them, all the matches are kind of right there, okay?
+[04:12.340 --> 04:18.420]  So here's two screens, we are doing a sorting,
+[04:18.420 --> 04:21.380]  the join here on attribute A1,
+[04:21.380 --> 04:27.860]  which conveniently is the first attribute in both of these relations, okay?
+[04:27.860 --> 04:29.620]  Both of them are sorted.
+[04:29.620 --> 04:32.820]  Note one key thing here is that there is a duplicate here.
+[04:32.820 --> 04:37.300]  There is no reason why there cannot be a duplicate on the join attribute.
+[04:37.340 --> 04:40.740]  So in this case, we are showing one duplicate on the join attribute.
+[04:40.740 --> 04:43.300]  And that does, when you have duplicates on both sides,
+[04:43.300 --> 04:45.820]  there is some extra logic that's required to handle that, okay?
+[04:45.820 --> 04:50.740]  It's not complicated, but it does, like the code looks a little more complex.
+[04:52.060 --> 04:54.620]  So the way we're gonna do it is we'll start at the top of both of these
+[04:54.620 --> 05:00.780]  relations, and in this case, we notice that these two tuples are both A, okay?
+[05:00.780 --> 05:04.260]  Both have A1 equal to A, which means they join.
+[05:04.260 --> 05:06.740]  So we can immediately produce one output.
+[05:06.740 --> 05:10.660]  The output is A3, capital A, okay?
+[05:10.660 --> 05:15.140]  Because our goal is to find matching tuples, and these two tuples match.
+[05:15.140 --> 05:18.500]  These tuples matches with this tuple.
+[05:18.500 --> 05:24.060]  And so we can go ahead and produce that output immediately, A3A, okay?
+[05:25.980 --> 05:27.700]  First step okay with everyone?
+[05:27.700 --> 05:28.420]  Any questions on that?
+[05:30.660 --> 05:36.380]  Now at this point, we have to sort of move down, okay?
+[05:36.780 --> 05:40.100]  So in this case, typically there is slight asymmetry in that we decide that we
+[05:40.100 --> 05:42.100]  go to move down this list first.
+[05:42.100 --> 05:45.500]  So we'll go from this pointer to this pointer, okay?
+[05:45.500 --> 05:49.700]  So we go to the next tuple, BG.
+[05:49.700 --> 05:53.380]  Now this B here does not match A, okay?
+[05:53.380 --> 05:57.420]  Which means that now for this A tuple, we have no more matches.
+[05:57.420 --> 05:59.780]  We are done, okay?
+[05:59.780 --> 06:03.500]  Because if there were any more matches, they would all be right here in the top.
+[06:03.540 --> 06:08.140]  Since this relation is sorted by A1, all matching attributes,
+[06:08.140 --> 06:10.740]  all tuples with value A will be at the top.
+[06:10.740 --> 06:14.580]  So once we saw B, we know there is no more A now, okay?
+[06:14.580 --> 06:17.980]  So we can go ahead and move this pointer to here, right?
+[06:19.740 --> 06:24.380]  So we, this and move it here, okay?
+[06:24.380 --> 06:28.500]  Now at this point, we can compare this and this and see that, oh,
+[06:28.500 --> 06:30.940]  both of them do have the same B.
+[06:30.940 --> 06:35.100]  We can go ahead and output B1G, okay?
+[06:35.100 --> 06:44.060]  And then, once that is done, we move to the next one here, CN.
+[06:44.060 --> 06:49.460]  Once again, we see that C and B here do not match, so I can move that pointer down.
+[06:52.100 --> 06:56.700]  Now I'm here, so let me erase the ink now, it's all ink.
+[06:56.700 --> 07:03.340]  So now this pointer is here and this pointer is here, okay?
+[07:03.340 --> 07:09.820]  So far I have produced two outputs, I have produced A3A, I have produced B1G.
+[07:09.820 --> 07:15.660]  Now when I compare these two, I see that here I have a C and here I have a D,
+[07:15.660 --> 07:20.420]  which means that this relation, like this tuple CL is not going to find a match here
+[07:20.420 --> 07:21.500]  at all.
+[07:21.500 --> 07:23.060]  So I go ahead and move this down.
+[07:23.060 --> 07:26.420]  So at this point, which one I moved down kind of depends on the comparison between
+[07:26.420 --> 07:33.060]  this C and D, because this is smaller than D, I have no chance of finding any matches
+[07:33.060 --> 07:36.420]  for this, I could still find a match for this, okay?
+[07:36.420 --> 07:42.740]  So I move this pointer down and that pointer goes to Dn.
+[07:42.740 --> 07:46.460]  And then I can produce B8n and so on, okay?
+[07:46.460 --> 07:56.220]  So if you remember merge sort, this acts exactly like merge sort, except that in a merge sort,
+[07:56.220 --> 08:02.060]  I am sort of sorting the same relation or same set of two-pulse, let's say, or same
+[08:02.060 --> 08:06.660]  set of objects and I am sorting in a single set.
+[08:06.660 --> 08:14.620]  Here I am doing this across two separate relations, but the key step here is basically the same.
+[08:14.620 --> 08:19.940]  In a merge sort also, I would have two sets that I am merging or two, sorry, sequences
+[08:19.940 --> 08:25.660]  that I am merging and the merge operation looks exactly the same, okay?
+[08:25.660 --> 08:27.780]  So there is no difference between the two.
+[08:27.780 --> 08:42.980]  There is some differences because we are producing joint results, but it is pretty minimal.
+[08:42.980 --> 08:47.700]  The place where it gets a little complicated is that, you know, in the beginning I said
+[08:47.700 --> 08:53.260]  that we started A3, we see AA, we produce an output, then we move this down, we saw
+[08:53.260 --> 08:54.940]  a B, okay?
+[08:54.940 --> 09:07.660]  So going back to that first step, so initially I start with these two, I produce the first
+[09:07.660 --> 09:14.020]  one and the first one here, then I move this down, okay?
+[09:14.020 --> 09:19.100]  So at this point, this and this do not match, so I can sort of, what I said at that point
+[09:19.100 --> 09:23.660]  is that we move this pointer down, which is true, we do move this pointer down, but if
+[09:23.660 --> 09:27.220]  there is an A here, I kind of need to go back to the top again, okay?
+[09:27.220 --> 09:33.540]  So there is a little bit of extra logic required to handle the case, the sort of the case when
+[09:33.540 --> 09:38.740]  the joint attributes are not unique, that there are duplicates.
+[09:38.740 --> 09:46.220]  So a little bit more logic required, but it is again pretty relatively straightforward.
+[09:46.220 --> 09:51.260]  And again, if you are unsure about this one still, I recommend go back and review your
+[09:51.500 --> 09:57.420]  notes on sort merge or merge sort, which should have been covered in a 250 or something, I
+[09:57.420 --> 10:03.060]  am not sure which one covers it and you will see that these steps here are basically the
+[10:03.060 --> 10:07.860]  same.
+[10:07.860 --> 10:12.340]  Questions?
+[10:12.340 --> 10:16.980]  The benefits of sort merge join are, the biggest benefit over hash join is that it requires
+[10:16.980 --> 10:18.940]  a lot less memory, okay?
+[10:18.940 --> 10:25.300]  I only need to keep sort of this part here in memory, whereas with a hash join, I have
+[10:25.300 --> 10:28.500]  to build an entire hash table in memory on one relation.
+[10:28.500 --> 10:32.580]  If that relation is large, if both of the relations are large, that hash table can be
+[10:32.580 --> 10:37.700]  pretty big, whereas in a sort merge join, I do not need to keep that much, I do not
+[10:37.700 --> 10:41.820]  need that much memory.
+[10:41.820 --> 10:48.700]  If the relations are sorted, then the sort merge join is very fast, it requires BR plus
+[10:48.700 --> 10:56.300]  BS block transfers, BR is the number of blocks of R, BS is the number of blocks of S, and
+[10:56.300 --> 11:01.420]  so that is as fast as you can get, if both the relations are sorted.
+[11:01.420 --> 11:06.460]  If they are not sorted, then you kind of need to figure out the, add in the sorting cost,
+[11:06.460 --> 11:14.660]  which we will talk about briefly, in a minute.
+[11:14.660 --> 11:20.500]  In practice, what you find is that the comparison between hash join and sort merge join is really
+[11:20.500 --> 11:26.880]  like, there have been a series of papers written over the last 20 papers, each one sort of
+[11:26.880 --> 11:30.100]  coming to a different conclusion on sort versus hash, okay?
+[11:30.100 --> 11:35.500]  I covered this in the graduate class, I used to cover it a little bit in the graduate class,
+[11:35.500 --> 11:43.780]  but there was a paper in 90s saying hashing is generally superior, a paper in 2000 saying
+[11:43.900 --> 11:48.180]  on the newer hardware, sorting is better, another paper saying, no, if you just do it
+[11:48.180 --> 11:52.660]  this way, hashing is better, another paper saying, well, maybe if you do it this way,
+[11:52.660 --> 11:53.660]  sorting is better.
+[11:53.660 --> 11:57.100]  So sorting and hashing kind of have gone back and forth, and fundamentally you can choose
+[11:57.100 --> 12:00.340]  either one of them right now, if you were to build a new system.
+[12:00.340 --> 12:06.300]  For large memory systems, hashing seems to be generally superior, it has better constants.
+[12:06.300 --> 12:11.900]  The overall cost is very comparable, but the constants for hashing seem to be slightly
+[12:11.900 --> 12:12.900]  better.
+[12:13.020 --> 12:17.060]  But there is just so much nuance in, beyond the point, there is too much nuance in there,
+[12:17.060 --> 12:22.860]  it depends on the exact implementation and hardware itself.
+[12:22.860 --> 12:28.220]  So for all practical purposes, hash joins and sort merge joins, including the sorting
+[12:28.220 --> 12:30.620]  cost, can be treated as being equivalent.
+[12:30.620 --> 12:37.560]  They have very similar performance characteristics, they are both very good.
+[12:37.720 --> 12:43.000]  One key thing to note here, which is an interesting one, is that if I do a sort merge join of
+[12:43.000 --> 12:49.880]  these two relations, the result is going to be sorted on A1, the join attribute.
+[12:49.880 --> 12:53.760]  And let's say if I were to do a duplicate elimination after that, the fact that the
+[12:53.760 --> 12:59.320]  result is already sorted on A1 can make a duplicate elimination a lot faster.
+[12:59.320 --> 13:04.760]  So because of that, earlier systems preferred sort merge join, because they could exploit
+[13:04.760 --> 13:12.760]  that to speed up, not the join, but the operator after that, and I'm pretty sure PostgreSQL
+[13:12.760 --> 13:18.040]  also still exploits this.
+[13:18.040 --> 13:26.440]  So to quickly summarize joins, so we talked about nested loops join first, it's a simplest
+[13:26.440 --> 13:31.080]  two for loops join algorithm, it's always applicable.
+[13:31.080 --> 13:37.000]  Then we talked about index nested loops join, which only applies if we have an index on
+[13:37.000 --> 13:38.000]  the join attribute.
+[13:38.000 --> 13:48.640]  We talked about hash join, which only works for equi-joins, whereas other join algorithms
+[13:48.640 --> 13:52.700]  can be used even for conditions like this.
+[13:52.700 --> 13:58.520]  And then we talked about sort merge joins, and as I just said a couple of times, hash
+[13:59.120 --> 14:04.600]  merge joins are very comparable to each other, and the choice between them tends to come
+[14:04.600 --> 14:12.660]  down to minor implementation details.
+[14:12.660 --> 14:18.200]  We talked about doing outer joins using hash tables, but there exists algorithms to do
+[14:18.200 --> 14:24.440]  outer joins using sort merge or index nested loops and so on, or maybe not the index, index
+[14:24.440 --> 14:32.200]  one is trickier, but doing sort merge join, adding outer joins to it is not that difficult.
+[14:32.200 --> 14:36.600]  For instance, and I won't go through the details of it, but here for instance, when
+[14:36.600 --> 14:43.480]  I notice that CL does not have a match, because I'm here and here, and C and D don't match,
+[14:43.480 --> 14:48.320]  at that point I know that CL does not have a match, and I can produce the outer tuple
+[14:48.320 --> 14:51.480]  for it, the outer join tuple for it.
+[14:51.520 --> 14:57.720]  So with null CL, I can produce that, similarly when I come to F7, I jump from D to M, I know
+[14:57.720 --> 15:03.000]  that F7 does not have a match, so if I'm doing a left outer join, at that point the F7 can
+[15:03.000 --> 15:04.680]  be output with the nulls.
+[15:04.680 --> 15:09.920]  So it's relatively simple modifications to take the basic sort merge join algorithm,
+[15:09.920 --> 15:18.320]  and add the left or right or both outer joins to it.
+[15:18.320 --> 15:24.880]  The outer joins are a little trickier with nested and index nested, left outer join would
+[15:24.880 --> 15:30.760]  be straightforward, the right outer join would be a little bit trickier, because again with
+[15:30.760 --> 15:40.080]  index nested loops join, if you go down here to the index algorithm, and if I'm doing
+[15:40.080 --> 15:46.000]  a left outer join, I'm doing it R left outer join S, at this point if a tuple in R does
+[15:46.040 --> 15:52.320]  not find a match in S, I can output that with nulls, but finding tuples in S that did not
+[15:52.320 --> 15:55.920]  have a match in R is going to be a lot trickier.
+[15:55.920 --> 16:03.600]  So I would probably never use index nested loops join to do a right outer join, but I
+[16:03.680 --> 16:18.320]  could do a left outer join, like it's pretty straightforward.
+[16:18.320 --> 16:22.960]  Any questions before we continue with the next topic would be group by aggregates, so
+[16:22.960 --> 16:32.160]  any questions before we get to that?
+[16:32.160 --> 16:36.960]  Group by aggregates, so ignore this, I'll just show you the pseudo code for this, the
+[16:36.960 --> 16:44.400]  query we'll look at first is this one, select A count B from R group by A, and again remember
+[16:44.400 --> 16:49.200]  the semantics of this, what we want to do is we want to take R, we want to group it,
+[16:49.200 --> 16:56.240]  group the tuples of R by A, and then we want to count the number of tuples in each group,
+[16:56.240 --> 17:01.480]  so this is what the algorithm for the pseudo code for this would look like.
+[17:01.480 --> 17:05.120]  What we are going to do is we are going to keep a hash table, so this is hash base, so
+[17:05.120 --> 17:23.560]  we are going to create a hash table, I thought I had an, I don't have an example.
+[17:23.560 --> 17:29.520]  So the idea behind the group by hashing is that we are going to use the hash table to
+[17:29.560 --> 17:37.600]  sort of keep track of the result of the group by along the way while we are processing it,
+[17:37.600 --> 17:45.160]  it's actually easiest shown using an example, let me see if I can do that, so for instance
+[17:45.160 --> 17:58.720]  imagine that I have a, so this is the value of A, and this is the value of B, let me one
+[17:58.720 --> 18:14.200]  second.
+[18:14.200 --> 18:43.680]  So we are trying to do, select A, count B from R group by A, okay, so this is the result
+[18:44.160 --> 19:00.840]  okay, all right, we will do it this way, let me know if you can't read it, I can try to
+[19:00.840 --> 19:11.160]  make it slightly bigger, so that's the query I want to do, select A, count B, okay, and
+[19:11.160 --> 19:15.560]  then I have from R, and then I'm doing a group by A, okay, and that's my, some example
+[19:15.560 --> 19:20.120]  tuples I have, so I'm going to be creating a hash table, okay.
+[19:20.120 --> 19:25.560]  Now one way to do this is, remember the goal of the grouping, sort of the definition of
+[19:25.560 --> 19:29.520]  group is to group them tuples, right, so let's go ahead and like one option is to just group
+[19:29.520 --> 19:36.440]  the tuples, let's say the hash table is initially empty, I look at the first tuple which is
+[19:37.440 --> 19:47.160]  and in the hash table, I add, so at this point my hash table looks like key is 1, and I'm
+[19:47.160 --> 19:53.200]  going to have one tuple in it, okay, so I'll create a list, 1 comma B1, okay, so after
+[19:53.200 --> 20:02.240]  the first tuple, my hash table will contain, the key is 1, the list in the hash table is
+[20:02.240 --> 20:10.880]  the list of tuples with that value of A, okay, make sense? Then I'm not going to keep writing
+[20:10.880 --> 20:19.080]  this, so second tuple, or maybe I, yeah, so second tuple, now I have a second tuple with
+[20:19.080 --> 20:31.600]  a second key, so I'll go ahead and add that in here, okay, then third tuple, third tuple
+[20:31.600 --> 20:41.040]  is the same value of A, so I'm going to go ahead and add it here, fourth tuple, it's
+[20:41.040 --> 20:46.200]  a new value now, note that I'm doing this as sort of a list here, but there is basically
+[20:46.200 --> 20:55.600]  a hash table, okay, so the left side here is the key and this is the value, make sense
+[20:55.600 --> 21:01.040]  to everyone? Any questions on what we're doing here? So, all I'm doing is I'm using the hash
+[21:01.040 --> 21:06.880]  table to create a grouping, okay, when I see a new tuple, let's say 1 B4, I take the value
+[21:06.880 --> 21:12.200]  of A and I look up in the hash table to see if there is already a list for it, if there
+[21:12.200 --> 21:16.600]  is a list, I go ahead and append to that list, if there is no list, I create a new list and
+[21:16.600 --> 21:29.680]  add it in, okay, so pretty straightforward hash table, at the end of this, so fifth tuple
+[21:29.680 --> 21:45.840]  gives me another value here and then sixth tuple gives me another value here, okay, once
+[21:45.840 --> 21:51.560]  I'm done, once I'm done with the, with all the tuples, I can go through this hash table
+[21:51.560 --> 21:58.360]  and for every key, all I have to do is output the count, okay, and I'm done, my output is
+[21:58.360 --> 22:13.720]  going to be 1 3 2 2 3 1, so at this point, once this is done here, at the end, go through the hash
+[22:13.720 --> 22:30.120]  table, output 1 3 2 2 3 1, so value of A followed by the count, make sense, any questions on what
+[22:30.120 --> 22:49.480]  we did here, do I really need to keep these entire groups around, could I simplify that,
+[22:49.480 --> 22:55.520]  just the list of B's, okay, that would certainly reduce the storage, but can I do even better
+[22:55.520 --> 23:02.200]  than that, just the count, there is really no reason, if my goal, final goal is to compute
+[23:02.200 --> 23:17.880]  the count, that I actually need this, right, I can instead simply store 1, 2, 2, 1, 3, 1,
+[23:17.880 --> 23:25.680]  so I can just keep a running count for each group, okay, what other aggregates could I do
+[23:25.680 --> 23:35.960]  this way, by just keeping the running something, sum, yeah, so this is count, I could do sum,
+[23:35.960 --> 23:50.240]  B1 plus B2, what else, lots of other aggregates we have, we have average, we have max, we have min,
+[23:50.240 --> 24:02.160]  we have median, we have more, standard deviation, how would you do average, I can't keep a running
+[24:02.160 --> 24:11.360]  average, so max and min I can do, okay, at all times I can simply maintain max equal to max of
+[24:11.360 --> 24:31.960]  B1 comma B2, I could do min, min of B1 comma B2, what else, so for average, we can't keep track
+[24:31.960 --> 24:39.360]  of running average, but we can keep track of the running count and sum, so I need two values per hash
+[24:39.360 --> 24:47.240]  entry, but I don't need to keep the whole list, two values is enough, okay, what else, I could do
+[24:47.240 --> 24:51.600]  a standard deviation also, if you are comfortable with the formulas for standard deviation, even
+[24:51.600 --> 24:56.720]  though the main formula looks complicated, there is a transformed formula which can actually be
+[24:56.720 --> 25:01.960]  done in a running count way, you kind of have to keep track of the sum and you have to sum up,
+[25:01.960 --> 25:08.360]  so the standard deviation formula requires you to do a, so if I'm doing a standard deviation of
+[25:08.360 --> 25:14.400]  x1, x2, x3, I have to keep track of x1 plus x2 plus x3 as well as x1 square plus x2 square plus
+[25:14.400 --> 25:20.560]  x3 square, so as long as I keep those two along with the count, I can do standard deviation also,
+[25:20.560 --> 25:35.080]  what about, what about this one, there's a common query for us, count distinct B, how would I do
+[25:35.080 --> 25:49.520]  that, so we know how to do sum, count, max, min, average, let's talk about a few others, what about
+[25:49.520 --> 26:08.880]  count distinct B, anyone, distinct B is what, so I have to keep the distinct values, not every value,
+[26:08.880 --> 26:13.640]  but I have to keep the distinct values of B, so there isn't really much getting around keeping a
+[26:13.640 --> 26:25.880]  list of B1, B2 and as I'm getting new values of B with the same value of A, I keep adding them,
+[26:25.880 --> 26:35.400]  this is a set not a list, I can maintain it as a set and I can keep adding to this and the set will
+[26:35.400 --> 26:40.360]  obviously, Python set is not going to be a good implementation for this in practice, but if I'm
+[26:40.360 --> 26:44.880]  just writing pseudo code, I can just use Python set for this, I can keep adding to the set,
+[26:44.880 --> 26:53.200]  ultimately the size of the set will give me count distinct B, same is true for median, not distinct
+[26:53.200 --> 26:58.600]  part, I have to just keep a list of all the Bs, if I want to compute the median B and same is true
+[26:58.600 --> 27:06.400]  for mode, there exist some optimizations for things like median and mode, but fundamentally,
+[27:07.360 --> 27:11.520]  the simplest way to do it would just be to keep the entire thing out, in fact for something like
+[27:11.520 --> 27:19.760]  a median sorting based approach is much better, because for median what I can do is, I can first
+[27:19.760 --> 27:33.680]  sort this, but I have to sort within each one as well and then kind of once it's sorted, I can kind
+[27:33.680 --> 27:39.040]  of find the median more quickly, but if I were to use hashing for it, I'll have to keep the entire
+[27:39.040 --> 27:51.840]  list around like I'm doing here, median mode will both be like that and those are the standard
+[27:51.840 --> 28:01.920]  aggregate operations, so as much as possible, we'd like to do them in this way, but in some cases,
+[28:02.080 --> 28:09.200]  I have to maintain more information, in a system like PostgreSQL, the aggregate code is actually,
+[28:09.200 --> 28:19.760]  it's kind of one operator, one implementation with if cases, with sort of case statement to
+[28:19.760 --> 28:23.880]  handle different aggregates, but I do think, I don't remember, I haven't looked at the aggregate
+[28:23.880 --> 28:28.840]  implementation in PostgreSQL closely, but it's possible that things like median are handled in
+[28:28.840 --> 28:34.800]  a different code altogether, but certainly for count, sum, min, max, average, it has the same code,
+[28:34.800 --> 28:41.000]  which is if conditions to change what is maintained, in fact it's not even if conditions,
+[28:41.000 --> 28:55.720]  it's sort of, it overloads some functions to do that, so that is this code here, we create the
+[28:55.720 --> 29:17.200]  hash table in the open call, so if the groups are not, again, one of the challenges with the
+[29:17.200 --> 29:24.080]  iterative implementation is this requirement that you produce one tuple at a time, so this
+[29:24.080 --> 29:30.840]  code is using the fact that self.groups is none to do the first initial building of the hash table,
+[29:30.840 --> 29:35.400]  so what you see is that in the open call, we create the hash table, but we don't actually build it,
+[29:35.400 --> 29:42.280]  we just create the data structure, groups is set to none, in the first call, when the groups is
+[29:42.280 --> 29:49.200]  none, it goes through the entire relation R and creates the hash table, note that this hash table,
+[29:49.200 --> 29:58.360]  this code is designed for count, so it's doing this self.h.get 0 plus 1, then once the hash table
+[29:58.360 --> 30:05.040]  is built out and we have this all the entries populated, we get the entries and then start
+[30:05.040 --> 30:14.720]  returning the tuples one by one, and so that's kind of it, pretty straightforward code, I think
+[30:14.720 --> 30:27.000]  the indentation here is, if self.groups is none, read R and read your hash table, populate self.groups
+[30:27.000 --> 30:37.760]  and after that simply pop the tuples one at a time, and the end result of this code here is that
+[30:37.760 --> 30:44.160]  after I'm done with the entire relation scanning, H of R dot A is exactly equal to the count that
+[30:44.160 --> 30:57.720]  I'm looking for, any questions on this code? Sum will just require changing the code to do
+[30:57.720 --> 31:07.520]  us plus R dot B, min will require it to do a min, max will require it to do a max, average requires
+[31:07.520 --> 31:15.440]  to compute sum and count, the code slightly changes, I was trying to get this code to fit in the
+[31:15.440 --> 31:19.960]  slide so the code looks somewhat weird in some places, but you know the idea, the idea is to keep
+[31:19.960 --> 31:27.840]  the sum and the count in the hash table, and in the end I can't just pop the things from the hash
+[31:27.840 --> 31:34.680]  table directly, I have to actually compute the average, same goes for median, in median I'll
+[31:34.680 --> 31:42.880]  collect all the values and at the very end I'll compute the median before returning it as a tuple
+[31:42.880 --> 31:57.960]  to the calling operator, any questions? You can also use sorting for doing aggregation,
+[31:58.800 --> 32:06.120]  it's relatively straightforward, we sort the relation by A and then once I sort it by A as
+[32:06.120 --> 32:22.640]  we saw here, as we saw here, once I sort by A all the tuples in the same group are contiguous,
+[32:22.720 --> 32:29.640]  so I can kind of read the group and do whatever grouping computation I need to do, and so it's
+[32:29.640 --> 32:34.640]  really the code itself is pretty, I don't have the code on the slides, but you know it's relatively
+[32:34.640 --> 32:42.640]  sort of just goes to the sorted tuples and just computes the results one by one, sorting is better
+[32:42.640 --> 32:48.080]  for aggregation, if I'm starting from scratch the sorting implementation is cleaner than hashing
+[32:48.080 --> 33:00.040]  implementation, we talked about outer joins, this slides are still here, we'll briefly go
+[33:00.040 --> 33:08.360]  through a few other operators, one is duplicate elimination, duplicate elimination is where I
+[33:08.360 --> 33:14.960]  need to let's say do select distinct A, you can use hashing for this but sorting is easier, so if
+[33:14.960 --> 33:20.720]  you sort the relation all the duplicates are going to be next to each other and so you can just throw
+[33:20.720 --> 33:28.080]  them away, so this is assuming that I'm doing a distinct on the entire relation, so I sort the
+[33:28.080 --> 33:34.360]  relation, read the tuples in sorted order and for each tuple I basically compare it to the previous
+[33:34.360 --> 33:39.640]  tuple and if the two tuples are identical then I throw this tuple away as in I don't output it,
+[33:39.640 --> 33:44.480]  but if the tuple I'm currently reading is different from the previous tuple I output it,
+[33:45.040 --> 33:50.160]  so which means that if there are duplicate tuples only the first tuple will be output and the second
+[33:50.160 --> 33:58.360]  will not be output, so and that's pretty much it, the pseudo code for sorting based duplicate
+[33:58.360 --> 34:03.920]  elimination looks like this and again there is a hashing version of it which just builds a hash
+[34:03.920 --> 34:12.700]  table and uses the hash table to sort of find duplicates, in a hash table if I add the same
+[34:12.700 --> 34:21.900]  tuple second time it will collide and I will know that there is a duplicate, any questions,
+[34:21.900 --> 34:31.260]  set operations I only have one slide on it because set operations are relatively straightforward,
+[34:31.260 --> 34:38.180]  union if you remember let's talk about union all first, union all preserves all the duplicates,
+[34:38.180 --> 34:44.820]  this is the simplest operator because I literally output all tuples of R followed by all tuples
+[34:44.820 --> 34:51.980]  of S, union all does not require me to do anything, just output everything, output all of R,
+[34:51.980 --> 34:59.620]  output all of S, the problem with union intersect is that they require you to remove duplicates,
+[34:59.620 --> 35:10.020]  so their implementations do require some work, so in order to do union one option is to go ahead
+[35:10.020 --> 35:16.980]  and append tuples of R and S together and just do a duplicate elimination over the entire set
+[35:16.980 --> 35:30.780]  of tuples, so in other words I feed all of R followed by all of S into a duplicate elimination
+[35:30.780 --> 35:37.980]  operator, I'm just curious what plan PostgreSQL generates for this, let me see if I can quickly
+[35:37.980 --> 36:00.380]  fire up pgadmin, there it is
+[36:07.980 --> 36:31.860]  so I have pgadmin, let's see select into I1, reactable I1 as select star from instructor,
+[36:31.860 --> 36:57.980]  I think this is fine, yeah so you can see the plan that it generated, it did use a hash
+[36:57.980 --> 37:06.500]  aggregate for some reason but what it did is it has an append operator that simply combines all
+[37:06.500 --> 37:13.660]  of I1 and all of I2 and then it uses a hash based aggregate to do a duplicate elimination,
+[37:13.660 --> 37:20.100]  note that even there is no aggregate in this query, this query is a union query, no aggregate,
+[37:20.100 --> 37:26.020]  no group by but it still used hash aggregate, that's because again the distinction between
+[37:26.180 --> 37:31.740]  physical and logical operators, logically we are doing a duplicate elimination, physically
+[37:31.740 --> 37:38.340]  the operator is an aggregate hash aggregate operator, so we are using a hash based duplicate
+[37:38.340 --> 37:49.820]  elimination after appending I1 and I2, you could also use sort based but it chose to use hash
+[37:49.820 --> 37:55.100]  based because the relation sizes are small, if I had large relations which this table doesn't
+[37:55.100 --> 38:07.340]  really have I would use, I'll probably use sorting, I could try connecting to, any questions by the
+[38:07.340 --> 38:28.500]  way on what I just did here, so union requires us to do duplicate elimination because that's
+[38:28.500 --> 38:42.660]  a semantics of union, so the logical operator, so first of all the union here is split into a
+[38:42.660 --> 38:48.740]  append that combine the two relations followed by duplicate elimination, that's the query plan,
+[38:48.740 --> 38:53.540]  okay, like if I were to do a logical query plan for it that would be the query plan I would do,
+[38:53.540 --> 39:00.820]  an append followed by a duplicate elimination but in Postgres QL the duplicate elimination
+[39:00.820 --> 39:07.420]  is implemented either as a sort based method or a hash based method, so we are using the hash
+[39:07.420 --> 39:12.340]  based method, now it turns out the way you do duplicate elimination is by building this kind
+[39:12.340 --> 39:17.140]  of hash table that we saw on the example that we worked out, something like this,
+[39:17.140 --> 39:25.700]  like this kind of a hash table, we are going to use something like this to do the duplicate
+[39:25.700 --> 39:32.940]  elimination but that's also what I'm using for aggregates, so Postgres QL does have a single
+[39:32.940 --> 39:39.260]  hash aggregate operator that can handle both aggregations as well as duplicate elimination
+[39:39.260 --> 39:45.780]  and so it kind of overloads that physical operator, so two separate logical operators
+[39:45.780 --> 39:54.780]  and aggregate operator as well as a union operator are both getting mapped to the same
+[39:54.780 --> 40:04.940]  physical operator in the code, when I say physical I mean the operators as implemented in the code,
+[40:04.940 --> 40:13.660]  like Postgres QL code base as do most databases have a form of operator like in Python I would
+[40:13.660 --> 40:19.700]  have a class operator and then every other operator subclasses that, so the names you see
+[40:19.700 --> 40:26.700]  are those subclass names and so they have a hash aggregate and there is also a sort aggregate which
+[40:26.700 --> 40:34.780]  I could probably get it to pop up if I used large enough tables but these tables are too small
+[40:34.780 --> 40:41.380]  so it prefers to use hashing. The in-memory cost model, the cost model that Postgres QL has
+[40:41.380 --> 40:51.820]  from my experience seems to prefer hashing if the relations are small enough. Any other questions on this?
+[40:51.820 --> 41:02.660]  Intersection is similar to joins, intersection in fact is exactly join, when you say intersect
+[41:02.660 --> 41:10.020]  you are effectively trying to say do a natural join between R and S on all the attributes and so
+[41:10.020 --> 41:15.900]  that's why intersect all and intersect are both implemented using join algorithms, so if I were
+[41:15.900 --> 41:27.180]  to going back to Postgres QL code, if I were to try to do this as an intersect instead, you should
+[41:27.180 --> 41:37.700]  see and no guarantees but we should see a join operator pop up. It used something called a hash
+[41:37.700 --> 41:46.220]  set of intersect, I have no idea why it used that but it decided to use a different operator. I wonder
+[41:46.220 --> 41:52.500]  if I do intersect all, will it use a join? No, still using, so it looks like for intersect,
+[41:52.500 --> 42:05.220]  I don't know why it didn't use that for union then, in any case looks like Postgres QL has a
+[42:05.220 --> 42:10.660]  different operator to handle intersects but you know the standard implementation for intersect
+[42:10.660 --> 42:15.380]  look very similar to joins, so the same operator can be used for both of them.
+[42:15.380 --> 42:29.540]  I said yes but actually don't know, let me just try the, oh yeah there it is.
+[42:29.540 --> 42:41.940]  Any other questions on this? That is the only slide we had on set operations, so any questions?
+[42:46.060 --> 42:51.740]  If not, we can move on to the last topic that we wanted to discuss here which is how to handle
+[42:51.740 --> 42:58.180]  external memory, like how to handle the situation when relations are larger than the memory that you
+[42:58.180 --> 43:08.500]  have. So let's get into that, we'll talk about hash join first and then we'll talk about sorting
+[43:08.580 --> 43:16.860]  and one thing I'll note here is that even though we talk about this in the context of memory being
+[43:16.860 --> 43:21.460]  smaller than the relation sizes, the same techniques show up in a distributed setting,
+[43:21.460 --> 43:28.060]  very similar ideas show up when I'm trying to do a hash join in a data center across a bunch of
+[43:28.060 --> 43:36.300]  machines. So we'll see that sort of in a couple of classes from now. The original hash join that
+[43:36.300 --> 43:44.980]  we saw looked something like this, we need S in memory and we build a hash table on it and then
+[43:44.980 --> 43:51.380]  for every tuple in R we go through this hash index, we kind of look into the hash index to
+[43:51.380 --> 43:59.300]  find matching tuples. Now the problem is what if S is too big, what if S is bigger than the amount
+[43:59.300 --> 44:06.620]  of memory I have available. So if S is too big, what I'm going to do is I'm going to split S into
+[44:06.620 --> 44:14.900]  pieces, I'm also going to split R into pieces. So here's in fact since this seemed to work out
+[44:14.900 --> 44:44.740]  pretty well, let me try this here. So let's say R is A, B and so on.
+[44:44.900 --> 45:04.500]  Then I have S. So I'm trying to do a join on R and S on B. Now imagine that S is too big to fit in
+[45:04.500 --> 45:09.740]  memory. Obviously I can't write that out here, but just imagine that there's too many tuples in it.
+[45:09.740 --> 45:18.180]  The in-memory version of it is that the simple version is that I build a hash index hash table
+[45:18.180 --> 45:28.180]  on all of S. The partitioning version of it is I first partition S into pieces and then I build
+[45:28.180 --> 45:34.100]  a hash table on each one of them separately. So what does that mean? Let's say I know that the
+[45:34.100 --> 45:45.300]  B values are in a range from 1 to 1000. So B1 to B1000. So what I can do is I can create a partition
+[45:45.300 --> 45:57.100]  of S which is values of B or partition of S where B is less than B500 and S2 is a partition of S
+[45:57.100 --> 46:08.340]  where B is more than B500. So I create two partitions of S and I'll discuss exactly how these are created.
+[46:08.340 --> 46:13.060]  They're also created using hashing, but for now let's focus on the partitioning part and not how
+[46:13.060 --> 46:19.500]  they're created. I'm going to create two partitions of S into S1 and S2 and let's hope and the
+[46:19.500 --> 46:25.820]  partitions will be created such that each partition is a small enough to fit in memory. So maybe I
+[46:25.820 --> 46:41.180]  have like 10 partitions, right? B501 less than B less than B1000. Partition of S where N is 4,
+[46:41.180 --> 46:53.940]  something like that. Make sense? So I create four partitions of S with the hope, not with the hope,
+[46:53.940 --> 47:01.020]  but with the plan that each one of them fits in memory. Now I'm also going to create the partitions
+[47:01.020 --> 47:14.380]  of R in the same way because they have to match. So I'm creating partitions of S based on the values
+[47:14.380 --> 47:21.300]  of B and creating partitions of R based on the values of B. But the way I would do this partitioning
+[47:21.300 --> 47:28.180]  would be to ensure that all of S1, S2, S3, each one of them individually fits in memory. And then
+[47:28.180 --> 47:38.660]  I sort of do the join, join steps. Now join will be done using hash join. Read S1 in memory and
+[47:39.500 --> 48:01.140]  build a hash table on it. Go through R1 and use the hash table to find matches. And this will be S2,
+[48:01.140 --> 48:16.580]  R2, S3, R3. So once I've created the partitions, I'm going to join them pairwise. S1, R1, S2,
+[48:16.580 --> 48:23.980]  R2, S3, R3, S4, R4. And each one of them I will use a hash join for. But because when I created
+[48:23.980 --> 48:30.260]  this partition, I ensured that each of S1, S2, S3, S4 fits in memory, now I don't have the larger
+[48:30.260 --> 48:36.660]  than memory problem. So all of the S itself is too large to fit in memory. But S1, S2, S3, S4,
+[48:36.660 --> 48:45.100]  they are not too large to fit in memory. Each one of them can fit in memory. Of course, the key
+[48:45.100 --> 48:52.700]  thing here is that because I did this partitioning on B, I'm guaranteed that S1 and R1 have matching
+[48:52.700 --> 48:59.340]  tuples, but I never have a match between a tuple here and a tuple in R4. Because the B
+[48:59.340 --> 49:06.020]  values, the join is on B, and the B values of S1 and R4 are disjoint, which means that there is
+[49:06.020 --> 49:14.540]  no possibility that a tuple from S1 matches with a tuple from R4. I only have to look at S1, R1,
+[49:14.540 --> 49:27.460]  S2, R2, S3, R3, and S4, R4. Another way to sort of write this is to say S join R is equal to S1
+[49:27.460 --> 49:46.900]  join R1 union, S2 join R2, and so on. Any questions? So the slides do show this, but without the full
+[49:46.900 --> 50:00.540]  example. So the rest of previous part was just a text description of this. We have R, we created five
+[50:00.540 --> 50:06.820]  partitions of R, we created five partitions of S, and then we do a pairwise join between those
+[50:06.820 --> 50:13.540]  partitions, and that gets us the full results. The partitions are created in a step before the
+[50:13.540 --> 50:18.860]  join start. So we go through, first of all, we have to decide on the partitioning strategy. Like
+[50:18.860 --> 50:26.500]  I mentioned, less than B500, then B500 to B1000, and so on. That has to be decided a priority. Once
+[50:26.500 --> 50:31.700]  that is decided, I go through S, and I kind of create these partitions. Sort of, I'll just write
+[50:31.700 --> 50:38.620]  out to disk. The partitions are all written out to disk. So this is an expensive algorithm in that
+[50:38.620 --> 50:45.420]  sense, because everything is getting written out to disk. But, you know, we have a constraint. We
+[50:45.420 --> 50:52.140]  have too little memory, so we don't really have a choice. So the cost of this algorithm can be high,
+[50:52.140 --> 50:59.260]  which is why you won't really see it getting used in most systems today, just because the memories
+[50:59.260 --> 51:05.700]  are too large today. Because the memories are so large, you rarely need to use these techniques.
+[51:05.700 --> 51:14.900]  If you do end up in this situation, sorting is more efficient than doing this. We would typically
+[51:14.900 --> 51:21.140]  use hashing for this purpose. In the example that I gave, I use ranges, but we would typically use
+[51:21.140 --> 51:27.780]  hashing for this purpose. So we would use a hash function to split S into five partitions. The same
+[51:27.780 --> 51:34.700]  hash function will be used to split R into five partitions. The range based is easier to explain,
+[51:34.700 --> 51:42.060]  so that's why I used it. But the implementations would actually use hashing for that. So we
+[51:42.060 --> 51:46.860]  typically need two hash tables. One, or two hash functions. One hash function to partition them,
+[51:46.860 --> 51:52.300]  and then the second hash function to actually build the hash table on three. So this hash
+[51:52.300 --> 51:57.740]  based external memory algorithm requires two hash tables, or two hash functions.
+[51:57.740 --> 52:27.580]  So what I mean is that this first partition into five partitions
+[52:27.900 --> 52:33.900]  I use a hash function for that. And then inside the hash table itself, I need a second hash
+[52:33.900 --> 52:40.940]  function. That's about the implementation of the hash table itself, but the hash table uses a hash
+[52:40.940 --> 52:48.460]  function internally to create the buckets. That's the second hash function. When I'm writing Postgres
+[52:48.460 --> 52:53.180]  itself, I can't rely on libraries of these hash functions. I'm writing my own hash functions.
+[52:53.980 --> 53:00.220]  I'm writing my own hash tables. So that's why I need to actually deal with two hash functions.
+[53:02.300 --> 53:07.420]  The main question that you need to sort of worry about, for instance, is that how do you guarantee
+[53:07.420 --> 53:14.220]  that the partitions of S all fit in memory? So for instance, if S has 10,000 blocks and I only
+[53:14.220 --> 53:21.820]  have 100 blocks of memory, if I try to use a hash function that sort of exactly hashes into 100
+[53:21.820 --> 53:27.100]  different values, that's not going to work out very well. Because hash functions do not do
+[53:27.100 --> 53:32.780]  uniform distribution. There is some variance in them. So I kind of have to add a factor to it
+[53:34.380 --> 53:41.900]  to allow for some variations across the bucket sizes. So these are all considerations that
+[53:43.580 --> 53:47.980]  I have to deal with in the actual implementation. These are the kinds of things that complicate the
+[53:47.980 --> 53:54.620]  implementation in an actual system. Dealing with a bad hash function. I picked a hash function.
+[53:54.620 --> 54:00.540]  Turns out that hash function, even though I was careful, is just really bad for my data set. So
+[54:00.540 --> 54:08.140]  I kind of need to figure out some way around it. We'll see this basic idea again in a distributed
+[54:08.140 --> 54:13.580]  setting when we talk about parallel architectures like how Apache Spark does it. Apache Spark does
+[54:13.580 --> 54:17.260]  joins in this way, but it's creating these partitions on different machines.
+[54:18.220 --> 54:26.460]  Each partition goes to a different machine. And a lot of high-performance data systems
+[54:26.460 --> 54:31.420]  use hashing to kind of do things like joins across a whole bunch of machines.
+[54:31.980 --> 54:35.180]  We'll talk about this when we talk about parallel architectures later.
+[54:39.900 --> 54:40.620]  Any other questions?
+[54:43.580 --> 54:48.220]  The last thing that we're going to talk about today and in this part is sorting.
+[54:50.060 --> 54:52.940]  Including both the normal sorting as well as the external sorting.
+[54:54.860 --> 55:01.420]  Sorting is a very common basis for many operations. Joins, duplicate elimination,
+[55:01.420 --> 55:07.740]  aggregates, just the query itself may have ascending or descending. So we need sorting.
+[55:07.740 --> 55:11.580]  Sorting is essential for us. If the relation is small enough,
+[55:12.700 --> 55:19.740]  we can just go ahead and do our standard sort. In C, Qsort implementation used to be the best
+[55:19.740 --> 55:24.060]  at one point. I don't know if that's still the truth, but the standard Unix provided
+[55:24.700 --> 55:29.820]  or the standard library provided Qsort was actually pretty good. Did really well.
+[55:30.540 --> 55:38.140]  Qsort has a bunch of really nice properties. I assume you are familiar with Qsort,
+[55:38.700 --> 55:44.380]  but in sort of implementations, even though all of these different sorting algorithms
+[55:44.380 --> 55:49.580]  have the same asymptotic complexity, Qsort is the one that ends up being the most efficient
+[55:49.580 --> 55:57.340]  in practice. If the relation is small enough and you need to do sorting, just use Qsort.
+[55:59.900 --> 56:05.740]  The relation is too large to fit in memory, which is not uncommon. We do something similar
+[56:05.740 --> 56:11.580]  to what we just did with hashing. What we do, for instance, like in this one, because I used
+[56:11.580 --> 56:23.980]  the ranges here, because I use the ranges here, forget this part, and let's say my
+[56:23.980 --> 56:32.540]  S is too large and we need to sort it. Well, we do exactly this.
+[56:35.100 --> 56:41.260]  We read S, we don't sort it, we just create partitions of it. The partitions are unsorted.
+[56:42.300 --> 56:47.260]  So when we are creating the partitions, there is one way to do it, there is multiple ways to do it,
+[56:47.260 --> 56:50.540]  but there is one way to do it. We can create these partitions of S
+[56:50.780 --> 56:55.340]  and write them out to disk, all of them, because they are too large to fit in memory at the same
+[56:55.340 --> 57:00.140]  time. So we create them, but we write them out to disk, and then we read S1 and we sort it,
+[57:00.780 --> 57:07.340]  and we write it back. Then we read S2, we write it back and so on. It's a very simple way to take
+[57:07.340 --> 57:19.500]  the same idea and use it for the case when S is too large. That's actually not the standard algorithm,
+[57:20.220 --> 57:30.220]  the standard algorithm is slightly different. So this is option one. The option two is
+[57:33.740 --> 57:39.180]  read as much of S in memory as possible,
+[57:39.820 --> 57:50.780]  sort, write out to disk as S1. Then you keep doing this.
+[57:57.660 --> 58:00.780]  So effectively what, let me move this up.
+[58:00.780 --> 58:10.140]  So effectively what we're doing is our goal is to sort S, we read as much of S as we can in memory,
+[58:11.660 --> 58:18.220]  we sort it, and we write it back to disk. Then we read the next chunk, sort it, write it back to
+[58:18.220 --> 58:28.620]  disk. So in the end of this, I have now, after this is done, I have four sorted lists of tuples
+[58:28.620 --> 58:34.860]  on disk. And at this point, I can merge them using the same algorithm we talked about earlier for
+[58:35.740 --> 58:47.340]  merge join, very similar algorithm. I can use it to merge S1, S2, S3, S4.
+[58:49.340 --> 58:54.700]  So again, assuming you remember merge sort, if you don't go back and review that,
+[58:55.340 --> 59:02.940]  this is merge sort. Merging S1, S2, S3, S4 is basically merge sort. In a merge sort,
+[59:02.940 --> 59:07.020]  I only merge two things at a time. Here I'm merging a larger number of things,
+[59:07.020 --> 59:14.700]  but the basic algorithm is the same. And I'm done. As long as the amount of
+[59:15.660 --> 59:20.780]  memory is sufficiently large compared to S, it needs to have a square root relationship.
+[59:20.860 --> 59:26.860]  So if S is a million blocks, as long as I have 1,000 blocks of memory, I can do this.
+[59:28.060 --> 59:31.900]  And because of that square root relationship, it's very unlikely you will ever need to do
+[59:34.700 --> 59:41.900]  another step of this. So this is what's discussed in the slides here.
+[59:42.300 --> 59:48.140]  Let M denote the memory size. In phase one, we read the first M blocks, sort and write to disk,
+[59:48.940 --> 59:55.180]  then read next M blocks. At the end of it, we have N sorted runs of size M blocks each,
+[59:55.180 --> 01:00:01.420]  and then we do an N-way merge, and we are done. So this is an algorithm that actually does get
+[01:00:01.420 --> 01:00:08.780]  implemented. If I were to build a modern system right now, and if I needed to handle a situation
+[01:00:08.780 --> 01:00:14.140]  where the relationship sizes are larger than memory, I would do this, but I would not implement
+[01:00:14.140 --> 01:00:19.020]  the hash join in the external hash join way. That's too much work. One of them is enough,
+[01:00:19.020 --> 01:00:23.820]  and it's a rare enough case. This is better than the hash join version of it.
+[01:00:27.260 --> 01:00:32.860]  And this kind of shows pictorially an example of this. You have the initial relation. It's too
+[01:00:32.860 --> 01:00:37.420]  large to fit in memory. Our memory is three tuples here, and it's too large to fit in memory.
+[01:00:37.420 --> 01:00:42.940]  Our memory is three tuples here, so I create sorted runs. First, I sort the first three tuples,
+[01:00:44.060 --> 01:00:50.300]  GAD, they get sorted. I sort the next three tuples, next three tuples. I don't have enough
+[01:00:50.300 --> 01:00:55.900]  memory to actually merge all four of them simultaneously, so I merge these two, I merge
+[01:00:55.900 --> 01:01:01.580]  these two, and then I merge these two to get the final result. So this has one more step,
+[01:01:01.740 --> 01:01:07.900]  but in general, I would not need two steps. One step will be enough.
+[01:01:13.260 --> 01:01:20.380]  That was the last slide I had on this topic of operator implementations. Any questions at all
+[01:01:20.380 --> 01:01:27.020]  on any of this? Because our next topic is query optimization, which we will start most likely in
+[01:01:27.020 --> 01:01:32.940]  next class or the class after that. Any questions on any of this or in general?
+[01:01:37.500 --> 01:01:47.340]  All right. In that case, let's stop a few minutes early, and I'll see you for quiz three on Thursday.

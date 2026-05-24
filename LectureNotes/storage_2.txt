@@ -1,0 +1,642 @@
+All right, let us get started. So, before we sort of continue with the topic, any questions
+about anything? Any of the logistic issues? Yes. So, I did post the list of topics yesterday
+include stuff that we are going to cover today. Any other questions? All right. So, what we
+started discussing in the last class was what may be called storage representation, which
+is the kind of trying to ask the question of how do we map tuples to blocks? At the
+logical level, we have tuples. Tuples is what we work with, we write queries against. But
+at some point, those tuples have to be stored on disk or on SSD. When I use the word disk,
+I mean SSD or hard disk or some other storage mechanism that you might have. But at some
+point, all of that data needs to be on the disks in order for us to keep using it. And
+that is the question that we are asking. How does that actually work? And there are quite
+a few variations of it. And this ends up being much more important than you might think
+if your goal is to get the most performance out of the system. That is part of the reason
+why systems like PostgreSQL are fundamentally limited in exploiting the modern hardware.
+Those systems were built 30 years ago. They are not designed for the modern hardware.
+In fact, PostgreSQL in particular used to be a single threaded system. It could not
+even use multiple threads. I believe that has changed, but I am not sure exactly to
+what extent that has changed. Whereas the modern systems like DuckDB is one of the most
+popular systems right now. It is a completely new system built from scratch designed to
+exploit the modern hardware. There are issues that we are not going to talk about like vectorization,
+compilation and stuff like that. But DuckDB does all of them to get the most performance
+out of the hardware. But even some simpler things like how you lay out the tuples on
+disks and different ways to do it can have a significant impact on performance. And that
+is kind of what we are talking about right now.
+One question that we sort of skipped over last time was whether we want to use the operating
+system file system or not. Hopefully the question here is clear, but let me know and I can elaborate.
+In the older days, when people were building the most high performance database systems,
+they actually bypassed the operating system and directly used the disk. Because the operating
+system caused a lot of problems for them. Today it is much less common. Today with the
+levels of abstraction we have and even with cloud computing and so on, it is really not
+viable for the database systems to directly use the disks. So they end up using the file
+system. And that has significant implications. So the two options here are basically to use
+the operating system file system. Like if I am running this on Mac, I use the operating
+system file system. The standard way databases do this is they allocate a large file on disk.
+So they start with maybe a gigabyte sized file. You can control this parameter for PostgreSQL.
+And it allocates a large file on disk and then sort of manages the blocks within that
+file. Literally like a file is a list of bytes basically. You allocate it, zero it out to
+begin with and then manage your data within that. PostgreSQL makes an assumption that
+this file is contiguous on disk, which it does not have to be. Operating system might
+fragment it. But that is the assumption that PostgreSQL makes.
+So the problem, the major con with this approach is that the database system does not really
+have control over physical placement. And that is something that you give up when you
+use a file system that already exists. Make sense? Any questions on this? Can I briefly
+discuss this already? All right. The other one is DBMS directly works with the disks
+or uses its own operating system. This was really common at one point, but less and less
+common today. But even today, the really high performance database systems probably
+do something like this. They just bypass the operating system. One thing that has happened
+which has been nice is that the operating system has become much more efficient and
+it has provided more knobs to programs running on top of it, which makes it a little bit
+less of an issue that you do not have control over what is going on. Any questions?
+One thing that we will talk about a bit later on, which is a bigger problem, is that database
+systems actually need to control when things move to disk. Remember when we talked about
+the memory and disks and we said the data has to move back and forth between them? The
+operating system handles that. The problem is the database system actually needs guarantees
+on the order in which it is written. We will talk about this later. But without those guarantees,
+the database system cannot guarantee transactions. The asset property is that the database system
+is supposed to guarantee. It requires the database to have control over how the data
+moves back and forth, in particular when the data moves back to disk. If it does not have
+that control, then it cannot provide those guarantees. We will discuss this in more detail
+when we talk about transactions.
+Assuming that we are doing it through a file system, as I mentioned, PostgreSQL, for instance,
+allocates a large single file on disk and then sort of manages data within them. You
+can also do a different file per relation. SQLite does it. SQLite basically stores each
+relation as a separate file. I think MySQL also does it. Any high performance system
+is going to do something like this. Allocate a large file on disk and zero it out to begin
+with, let us say, and then manage data within that. Your file could end up looking something
+like this. This is a very simplified version, but your file could end up looking like this.
+This is your entire file that you pre-allocated. Then many of these blocks might be empty to
+begin with. Then you start placing your data into them. New tuples are inserted in instructors.
+They go here. New tuples are inserted in students. They go here. Updates to instructor also cause
+updates to this B plus tree, and so on. That is all of this. Any questions? All right.
+We talked about fixed length records. We talked about slotted page structure. This is where
+we ended last time, was the cache-optimized structure. Any questions on any of this material?
+Anything that would be helpful to go in more detail?
+I posted the homeworks. That is the best guidance I can provide on that right now.
+There were questions on packs in the previous homeworks. This takes care of within a block.
+When tuples are mapped to a single block in whatever mechanism you do, then the two things
+we talked about handle what happens within a block. We also have to worry about what
+happens across blocks. Given a particular record, which block should it go to? Assume
+that a relation has 100 blocks, approximately, and a new tuple comes in. Where should this
+tuple go? Since you have all been required, anyone want to try to suggest options for
+where a block should go? Where a new tuple should go? Let us say here. The new instructor
+tuple comes in. Let us assume there is space. Do not worry about pages being full. Where
+should the new tuple go and why? Anyone want to try to pick a page?
+Take a guess at that. Next to the? So, let us assume that the principle of locality is
+important to keep in mind. Let us assume all of these contain instructor tuples. Let us
+further assume that all of these blocks have space for now. In that case, should there
+be anything that governs where I dump this particular tuple in?
+So I have the instructor blocks. So these are all the instructor blocks. Let us assume
+that the number of blocks is fixed for now. We will worry about what happens when we run
+out of them. Let us say it is 100 blocks. Then the suggestion here, if I were to rephrase
+it, is that, and let us say there is instructor which has an ID. So what I will do is I will
+do an H of ID mod 100 and I will place it in the block that this comes out with. So
+this is block 0, block 1, block 2 up to block 99. I hash ID and take mod 100 so that I
+can fit it in this 100 and put it in the place where it gets located. Make sense?
+Any thoughts on pros and cons of this approach? There are basically three or four approaches
+we will talk about. Three, I guess. Any pros or cons of this approach? Anyone want to try
+to suggest?
+Same? But that is fine because these blocks can contain, let us say, 50 tuples each.
+So we will have collisions. After I do a mod, I will have collisions and that is fine.
+Well, yes and no. We are kind of pre-supposing the answer here a little bit. So the benefit
+of doing this is that if I am looking for a particular instructor with a particular
+ID, I know exactly which block it contains. That is kind of an index basically. It makes
+my searching much easier. If I am looking for instructor 101, I know the hash function.
+I simply take H of that and mod 100. I know exactly which block to go to. So in fact it
+actually makes indexing easier, not harder. Because remember the data movement from disk
+to memory is in the units of blocks. So I am going to read the block anyway. So it does
+not really matter if there is multiple tuples in the block and the tuples are laid out in
+different ways. The within block structure does not matter for disk to memory. It matters
+for memory to cache, which is where the packs comes in. But for disk to memory, because
+I am doing a block at a time, it does not really matter.
+Any other pros and cons of this? A big pro here is this particular indexing thing that
+was entered there. I can quickly find tuples that match a particular ID. A related con
+which exists for all of hash indexes is that I cannot do queries like this. This is difficult
+for me to do. If I am looking for all instructors between ID 90 and 102, which is a very common
+query, range queries as these are called are very common. These I cannot do using hash
+indexes very easily in general. There is one form of hash index. In general any hash index
+will make these queries more difficult. Any questions?
+And then of course, I have to worry about what happens when I run out of space in a
+block. There is a fixed number of tuples in each block. So, I kind of have to figure out
+what to do in that case. And again there are standard approaches. You can have overflow
+blocks or things like that. We will talk about this actually. We have a few slides on this
+material afterwards. So, that is option one, hash. What other option do I have to throw
+tuples into these 100 blocks? Anyone else? One thing is I could just throw them anywhere.
+Wherever there is empty space I could just dump it anywhere. There is no guarantees on
+the data and this is often called heap organization. Although I am not sure how common this, I
+completely misspelled that, heap organization. But I am not sure how common this is in practice
+anymore. The third approach is actually the one that is most commonly used, which is to
+keep them sorted. We sort all of these on ID. We have to choose one attribute to sort
+and it is typically the primary key. This is why we care about primary key a little
+bit in databases along with some other reasons. But one primary reason is also that the relations
+are usually sorted by the primary key. So, we are going to keep them sorted by primary
+key, 1, 2, 3. And this is actually one of the more common representations. So, anywhere
+there is called heap organization sorted by SSN. So, this is called sequential organization.
+But keeping it sorted would be painful. But you know there are quite a lot of benefits
+to doing this. So, we would actually usually do that. How would you search if it is sorted
+by SSN or ID in this case? So, if I have a million blocks here, the data is sorted by
+ID and I ask for ID equal to 397. How would I sort it? How would I sort it? How would
+I search through this? Binary search. Hopefully all of you know how binary search works. So,
+assuming I do not know anything else about the ID distribution because if I do know how
+IDs are distributed, I can do better. But assuming I do not know anything, I would jump
+to the middle and then jump here, jump here, jump here, jump here. So, that is binary search.
+Binary search will take log to the base 2 of 1 million which is equal to 20 blocks.
+So, I would have to read 20 blocks in the worst case if I were to do binary search on
+a million blocks. A million blocks is about 4 gigabytes of data. So, we are not talking
+like instant volumes here. 4 gigabytes is large, but it is not too large. So, 20 blocks. Remember,
+it takes 10 milliseconds per block read, approximately. It is a ballpark number we
+work with. So, that is 200 milliseconds for a single lookup, which means I can run 5 queries
+per second. That is actually really low. I cannot live with 5 queries per second, especially
+if my disk is simply busy just doing these queries and nothing else. The reason why it
+is so bad is because these are random reads. I am jumping here, then I am jumping here,
+then I am jumping here. At the end, they are somewhat close by, but overall they are
+sort of random reads. So, 20 random reads is a lot. Does anyone know how to make this
+better? Any thoughts on making this better than 20 reads? So, database systems will basically
+do 3 reads for a million blocks under certain assumptions, not maybe 4. So, not 20, but
+3 or 4. In fact, in practice, they end up doing like 1. So, we will talk about that
+when we talk about B plus trees. The third one is the hash keys. So, that is the approach
+that I suggested first. We call it hashing. Sequential, keep it sorted by search key.
+The big problem is you have to keep it sorted, which is not straightforward. So, the main
+problem is that the block where it belongs to may be full. So, these are sorted blocks,
+a new tuple comes in, it needs to be here, but this block is full. Now, what do I do?
+So, can I have to deal with that? The typical option is to create an overflow block and
+keep a pointer. But at some point, these overflow blocks become too painful to manage and then
+you have to re-sort of fragment it. There is no magical solution here. This is kind
+of what you do. Very engineering solution. So, you create overflow pages. At some point,
+you have a threshold, they become too much. You sort of bite the bullet and just reorganize
+it. The main challenge with reorganizing it is that everything is going to have to stop
+while you do this reorganization. So, you have to be a little bit careful in how you
+do it. Deletes, you know, just keep the free space. Don't worry about deletes. Insertions
+tend to be more common than deletes. So, the free space gets used up. Any questions?
+Inside the block? So, again, it doesn't help me for the disk to memory movement because
+I am going to read the entire block in memory anyway. So, what you do within the block is
+less important. It becomes important for CPU processing and there it may matter. But
+really the costly part is here fetching the block. And that doesn't really care about
+the within block order. It does matter, but just a little less. Any other questions? Binary
+research. Why did I get? Oh, this is billion, okay. So, this is basically just the same
+thing we talked about. Before we get into B plus trees, there is one last topic I wanted
+to cover, which is a really important topic and that you will encounter in the, in practice
+a lot, which is the column-oriented storage, okay. So, what I mean by that, you know, as
+shown in the example here. So, that's the row-oriented storage, okay, where I store
+tuples row at a time, okay. So, that's what we talked about earlier. So, this block contains
+a few records, this block contains a few records, this block contains a few records. That's
+my example relation. The column-oriented approach is to store columns together, okay. This is
+similar to the PACS thing we talked about, but this is doing it across all the blocks.
+It's not doing it within a block. PACS does it within a block, okay, whereas this approach
+is doing it across the entire relation. So, in fact, every block, like in a, in one example
+case here, this block will only contain the employee number. This block will only contain
+the employee name. This block will only contain the employee job titles and so on, okay.
+So, we're not like, we don't have multiple, like we don't have multiple attributes within
+a block at all. Each block only contains attributes from a single column, okay. Of course, one
+column gets spread out across multiple blocks, but each block itself will only contain one
+column, okay. So, this is called column-oriented storage and this has become increasingly very
+common, especially in high-performance systems, okay. Does this make sense? Any questions
+on this so far?
+How do you, like, retain the mapping from here? How do you know that 7309 is different?
+So the most important question that you have to first answer here is how do I reconstruct
+a specific tuple? Eventually, I'm going to need to reconstruct the tuple, okay, potentially.
+Someone might do a select star query, just to see, or they might say select star where
+employee is 7366 or whatever that number is. It barely read it, 7369, okay. So, you have
+to reconstruct the tuples. That's the most important challenge with this. There's two-three
+major challenges with column-oriented storage. That's one of them. So, the way you do it
+is, and this paper doesn't say it, but the positions of this matter. So, the first position
+in each column is one tuple. Second position is another tuple and so on, okay. So, you
+actually keep track of the positions and you can't mess with the positions. And so, those
+positions are what is going to allow us to reconstruct the tuples, okay. So, if I want
+to reconstruct tuple number three with 7521, I will essentially read the third entry from
+this column, third entry from this column, third entry from this column, okay. It's actually
+very expensive to read three different blocks in order to read a single tuple. In fact,
+five blocks in this case. In order to reconstruct a single tuple, I have to read five different
+blocks, whereas in the original case, I would have to only read one block. So, I'm actually
+paying a lot of cost to reconstruct the tuples, but the main sort of motivation for column-oriented
+storage is that most of the queries only access a few columns. In fact, it's not uncommon
+to see tables with 20, 30 columns and only a few of the columns, only one or two columns
+are used in each query. So, the benefit that you're getting is that you can only retrieve
+those two columns and not retrieve the rest of the 20, 30 columns, okay. So, that's where
+the trade-off comes in. Database systems, in general, systems is all about trade-offs,
+you know. There is no solution that's always going to work best under all circumstances.
+The trade-off here is that reading a single tuple is very expensive, but most analytical
+queries are much faster, okay. So, the benefit sort of to lay them, reduced IO, only fetch
+the relevant queries, especially useful when the table has 50 columns and the query only
+wants two or three of them. You have a much better CPU cache performance, okay. It's the
+same reason why PAX works well, same reason this also works well. The compression is much
+better. You can compress each block much better. Now, instead of a single block having some
+strings, some integers, some floats and all that, each block only has data of one type.
+That makes compression much better, okay. And then they can better utilize modern CPUs.
+We won't discuss this, but vectorized CPUs that we have today, column stores are naturally
+better at exploiting those, okay. Lots of pluses. The biggest drawback, reconstructing tuples
+is expensive. Updates are really hard, okay. Updating a tuple requires you to do a lot
+of extra work and deleting is also pretty hard. So, deletes and updates actually have
+to be treated differently for these systems, okay. Despite this, at this point, given current
+modern hardware, columnar storage has become extremely common. It's widely used in data
+warehouses and also in many other systems as well. Questions?
+So, that's a really good question. It does not have a super easy answer, but at the PACS
+school, I think PACS are an example of this. No, it doesn't have an example of this. There
+are a couple of different ways you can do it. First of all, you never really have something
+as empty. Databases will store it as a null. So, we can just store the null explicitly,
+okay. Better option is to keep track of, have an empty, like a bit array associated with
+the positions and you set the bit to be one if the data is null, okay, or vice versa.
+It really depends whether this is beneficial or not. It really depends on how many nulls
+you are expecting. If you are expecting lots of nulls, then having the bit array to keep
+track of the nulls is a better option, okay. But all of these tricks are played by modern
+data warehouses. They are trying to get the best performance out of the system and, you
+know, hundreds of papers have been written on how to optimize these things. Any other
+questions? We are not discussing this in a lot of detail. If you are really interested
+in this topic more, I highly recommend Dan Abadi's 624. 624 is designed for, like, as
+an undergraduate plus graduate course. It's pretty structured and you learn a lot about
+all of these things, okay, column-oriented storage, transactions, systems, and all of
+that stuff. If you are interested, I highly recommend that course, although I don't think
+he's teaching it in the next year, but I'm not sure. How many of you have heard of something
+called Parquet files, okay, Parquet or Avro files, especially those who have done intensures?
+Anyone? Have you heard of them? Do you know what they are? Anyone else? So the issue of
+columnar storage also comes up on files, right. So we are used to CSV files, okay.
+We are used to CSV files, right. CSV files have, you know, they are text files.
+We have dealt with these types of files a lot, okay, like in data science courses and
+in pandas, in just general processing. CSV files have several problems when I'm storing
+millions of records, okay. If I am storing millions of records, the CSV files have a bunch
+of problems. One is that they are text files. Text is really inefficient, so you would ideally
+like to compress it, okay. That's one problem. You have to deserialize it, okay, which means that
+when I read this, I have to actually read in the string, then I have to convert it into the object
+representation in order to use it, okay, because CSV files typically, you know, the first column
+is an ID, second column is a name. They have a very fixed structure in most cases, but I do have
+to parse it, okay. I don't get it for free, okay. So there is reconstruction cost and then there is
+the same issue that we just talked about, which is that the data will be stored in a row by row
+format because that's what the CSV file is, right. It's basically bytes that are stored on this and
+they are stored in this order, okay. However, we take the same ideas we just talked about and
+replace this first with a columnar format
+and second, we use an internal representation, sort of a more compressed
+representation that also does not require deserialization, okay, and that's the idea
+behind these formats called parquet, avro, protocol buffers, and arrow.
+They have slightly different use cases. Parquet is the one that we see most commonly,
+but all of them have very similar ideas. They are all designed to address basically this problem
+with CSV files, okay, which is that the text files, they need to be deserialized and they
+are fundamentally a row-based representation, okay. Parquet files will fix all three of these.
+First, you will move to a columnar representation, then second, the representation here will be
+compressed, and third, the representation will not require deserialization, okay,
+and it will somehow be able to directly read it without deserializing it and serializing it when
+you are writing it, okay. Parquet files are extremely commonly used today. If you end up
+in any system that you are dealing with significant volumes of data, you are likely to be using
+parquet files. You may not even realize it because the Python Pandas library can directly read from
+parquet. So you might not even realize you are using it, but you are using it, okay.
+So these are columnar file representations, okay. CSV or JSON, they also handle JSON,
+they actually handle JSON, but depends on which one. So they handle both CSV files and JSON
+collections. Modern data lakes have thousands to millions of such files, and they often support
+SQL over them through Spark. In fact, that's what Databricks, the company that sort of develops
+Spark, that's Databricks' big value proposition is this ability to write SQL queries against
+parquet files, okay. I'm simplifying a bit, but that's what they do.
+Same three things I just talked about. Binary compressed representations are faster,
+parsing or deserialization is expensive, and row versus column representation.
+Okay, sort of an example of it. They kind of look... So this is from the... I just put this
+out there because it's from the book. So if you wanted more details, you can certainly read it
+in the book. But topics like parquet, you are better off just, you know, looking for some
+tutorials online. You'll find tons of information. Sorry, I'm just trying to read. I don't really
+know the ORC format, so I'm just trying to parse this. I think basically what it's saying is that
+so each of these is basically a column, okay, or maybe not. Anyway, let's ignore this one for now.
+But it basically looks like a columnar format. The data is stored column by column with appropriate
+positions so that you can reconstruct them, okay. Any questions? All right. So this lecture gets us
+to the summary of this topic. Storage layouts are a very important consideration because the
+given like, you know, gigabytes or terabytes of data sizes, the significant impact of small
+changes here can actually be huge on your running queries, okay. Primary decision you end up making
+is row versus column. Row representations are better for transactional systems where you are
+updating. So PostgreSQL is actually better than its row representation because most of the uses
+of PostgreSQL are typically as a backend to a web application or something where updates are very
+common, okay. But Snowflake, Amazon Redshift, they require column representation. Databricks, Spark,
+you know, they kind of work better with columnar representation. Hybrid representations have been
+tried, but they really don't work. It's still sort of an open research question as to whether
+you can make them work, okay. And there are many other secondary considerations that we talked
+about. Sort orders, hashing, cache performance, and so on, okay. This is a big part of the
+performance and so on. This is a big topic. I've tried to give you sort of a broad sense of what
+some of these things are, but really if you're interested in digging deep into it, you would
+likely need to do more work or take another course. Not my 7.24, I don't cover that. The graduate
+course I teach, I don't go deep into these topics, but Dan does in his course. Similar issues exist
+for non-relational data as well. Document store also has similar issues. So whatever we do here
+can be applied to other domains. Like pandas, for instance, there have been quite a few improvements
+in pandas over the last few years trying to exploit some of these ideas there. Questions?
+Before we jump into the next topic. The next topic is B plus tricks.
+All right. So I'm not going to cover B plus tricks in a ton of detail. I'll explain why later.
+We covered it at a high level. The ideas, like as long as you get the basic ideas
+that that should be good enough. I've laid out some specific things to focus on in that
+post I made on Piazza. The book covers B plus tricks in a lot of detail. So if you're confused
+about anything, want to read it in more detail, the book is a great resource for it.
+So an index is something that helps us find tuples more efficiently. It's really not a very
+difficult concept to grasp. There are a lot of, you guys have already seen search trees.
+So B plus tree index is a variation on a search tree. So let's develop this ourselves before we
+actually go into the details of it. So let's say this is my instructor,
+sorted by ID. So ID one, two, five, seven, eight, nine, up to like, let's assume there are millions
+of them. So the question that comes up is, I want to search efficiently. These are blocks.
+Each of these is a block, contains let's say 100 tuples each. All of these are averages,
+so we'll assume that this contains 100 tuples approximately. So we already talked about the
+binary search approach. The binary search approach is to, assuming we don't know anything else,
+we jump right in the middle of these million blocks and let's say we're looking for ID equal
+to three, four, seven. We jump right into the middle of this and then we go here or here based
+on what we see. The problem with binary search is that it's going to be locked to the base of two,
+a million, which is 20. So the first question is, how do we make this better? How can we reduce
+the number of IOs that we're doing? By sort of realizing that the IO with the disk is in units
+of blocks. Anyone want to take a stab at this before I start with a simple solution here?
+Okay. So I'm going to jump ahead a little bit there to see the more extreme scenario. Let's
+say I give you one block to use, just one block. I tell you that this block you can use as an extra
+information to help you search. So what should that block contain? Just one block that can contain
+100 entries. I use the word entry here because these are not tuples per se, but there's something
+else. So what I'm going to do with these 100 entries is I'm going to create,
+I'm going to divide my million blocks into 100 chunks. And for each chunk, I will keep the ID
+here. ID 1, ID 5700, ID 6800, ID 9000, and so on. So what I'm doing here is that this one here is
+the first entry in the first chunk. 5700 is the first entry in the second chunk. 6800 is the first
+entry in the third chunk. I'm essentially going to keep track of the first ID in each of these
+100 chunks, and that I'm going to store here. Now when you ask me for 347, I know that 347
+must be in this range here because I can see this 1 and 5700. 347 lies between them,
+so it must be in here. And I can do a binary search in that. So this way I have reduced the
+number of binary search that I have to do by a factor of 100. Not number of binary search I have
+to do, but the amount of blocks I have to do a binary search over is now much smaller.
+Does this intuition make sense to everyone? Because B plus 3 is basically a generalization
+of this idea. This is more or less what B plus 3 does, except it will add more levels instead of 1.
+Any questions on this?
+So once again what I have is I have a single extra block. That block will contain whatever
+number of entries it can contain. It will contain essentially a pointer to the start of this chunk
+plus the smallest entry that I see in this chunk here. And same goes on.
+The B plus 3 will generalize this and say that even within this let's have another block.
+Let's go here. So I'll add another sort of block in between which will allow you to even
+narrow it down further. What I'm effectively doing is that I'm reducing the number of blocks
+I have to look at by a factor of 100 every time. So instead of doing log to the base 2,
+now I'm going to end up with log to the base 100 which is equal to 3.
+Because every time I'm reducing the range of blocks I have to look for by a factor of 100.
+And that's why B plus 3 gets me a 3 or even 2 in many cases, whereas binary search will require
+20 reads. Whereas a B plus 3 will get that to me in 3 reads in this case. Any questions?
+All right. So let's jump into it.
+So this is what a B plus 3 looks like from the book.
+What we see here is that so this is the relation. Here in this case the relation is separated out
+from the index which is how we saw it earlier on. The relation blocks are separate from the index.
+So we have pointers into the index. Note that this index is actually on name whereas the relation
+is sorted on ID. So that that has important implications here but it doesn't change the
+fundamentals of it. So at the top level I have a root node which helps me redirect between
+Mozart, less than Mozart and more than Mozart. Next level I have another thing that helps me
+sort of choose between you know less than Einstein, between Einstein and gold and more than gold.
+The way I use this B plus 3 is basically I started the root and I simply go down
+the appropriate path. So if I'm looking for sing if I'm looking for sing which is here
+I come here I say okay sing is more than Mozart go here sing is less than Srinivasan go here
+in this block I find sing there is associated pointer I follow the pointer and I get to wherever
+sing is and get to sing. So that's kind of how a B plus tree is used. The fundamental property
+that I need from the B plus tree is that this particular less than greater than is satisfied
+at all times. If that is not satisfied then I have a problem because that these these these are what
+are called search keys they are crucial to direct the traffic and I can't get them wrong they have
+to be you know if there's a mistake in them then I will not find the tuples I'm looking for
+and I might actually conclude that they don't exist. Any questions?
+So B plus tree node structure looks something like this the top level like everything except
+the root everything except the leaves so so these are leaves they have a slightly different
+structure than these because leaves are not redirecting traffic anymore they simply have
+direct pointers to data okay whereas these index nodes they are directing traffic they have a
+different structure okay slightly different. The index nodes have a structure that looks like this
+they are pointer key pointer key and so on key ki the keys are called search keys or search key
+values pi are pointers to children or pointers to leave the search keys in a node must be ordered
+for this to work remember in typically there will be hundreds or thousands of entries in each block
+not two in this case I have two there will typically be hundreds to thousands of entries
+okay so they have to be ordered and in fact I usually do binary search in them
+to more efficiently find what I'm looking for they are large enough that sequential scanning
+is actually inefficient but that's a cpu issue so we are more concerned about disk and memory here
+and they need to be ordered okay. Any questions?
+It is completely dictated by how fast it narrows down right so in this case I only have five nodes
+at the bottom here which results in two nodes here given the constraints on the number of pointers
+which results in one more node here there is no point to going further than that so it's
+completely dictated by how many blocks I have at the lowest level okay so every time I'm going
+to reduce it by a factor of hundred or thousand and at some point I reach one okay
+so that's a good point so an individual node at the leaf node what do you point to
+and that does actually depend a little bit on how the data is stored at the at the bottom of it
+right so
+so this is my lowest level of the index and this is my relation
+if this is an index on id and if this relation is sorted on id
+then I can simply put a pointer here and for all of these I can just sort of use the same
+pointer because it's sorted by like the index is on id so this is sorted by id
+this is sorted by id so it works out well okay but if this is sorted by id and the index is on
+name then I'm going to have you know pointers going all over the place because this is not
+sorted by name this is sorted by name so there will be a big mix of pointers now if for instance
+in this case there were two instructors named einstein I might have two pointers to two different
+places okay so einstein here may not have just one pointer it might have two pointers associated
+with it and that would be fine okay so if I'm looking for einstein I'll follow both of those
+pointers and one might be here one might be here no guarantee that they are sorted by by name
+I mean they are not sorted by name so they will be all over the place
+okay any other questions so this distinction between between ordered versus unordered is
+an important one they're also called primary versus sparse indexes or primary versus secondary
+indexes so this one is an example of a secondary index a primary index can only be built on the
+attribute on which it's sorted so in this case we can only have a primary index on id but we
+can have secondary index on name on department on salary and so on any questions
+you may not use a b plus tree in that case if I'm doing a select star there isn't really any
+benefit in doing b plus trees I might as well just go straight to the relation so it does depend
+like b plus tree is an option to use if you if it's beneficial it's most beneficial when there
+is only a few tuples that match the condition if if thousands of tuples are going to match the
+condition you're probably better off just doing a sequential scan just go to the relation scan
+from top to bottom or start to end b plus trees will be better if I'm looking for specific
+instructor or specific range of instructors or specific range of ids you know
+any other questions
+right so we're not going I'm not going to discuss b plus tree in a ton of detail
+I'll discuss at a high level and make sure you understand the key concepts but I will go through
+these slides the b plus tree is balanced so some of the trees that you might have seen like evil
+trees or two three trees or red black trees you know several of those are actually not balanced
+trees you can kind of have some leaves at a different distance than other leaves I've forgotten I don't
+know exactly which trees do you guys study in the earlier courses
+binary search tree but that's not really a is that actual search tree that you constructed
+what about avian trees
+kd trees kd trees is a bit more advanced all of like special trees are fine
+so but none of them are done in 351 I would have thought at least
+420 actually used to be a prerequisite but at one time we took it out because it made things too
+complicated for students but actually used to be a prerequisite 420 was a prerequisite for a bunch
+of courses at one point so in any case in future when you take 420 you will find out that you will
+learn about these different index trees and and many of them are not balanced b plus trees are
+balanced leaf nodes are contained simply pointers to tuples and also leaf nodes contain these special
+pointers that's like a next pointer that helps us sort of scan through the leaf nodes so if I'm
+looking for everything between Einstein and Srinivas and I will look for the starting point
+which is Einstein and then I will kind of just go through this okay and that for that I require
+the leaves to be chained so the last pointer in the leaves is a pointer to the next leaf
+sorry yeah it's kind of a linked list but linked list at the sort of the level of blocks okay so
+yeah it is a linked list
+any questions interior nodes are the search key so we kind of already talked about it
+how to search you follow the pointers okay it's logarithmic so if b is the number of entries per
+block maximum number of entries per block then the term that we use is log of n to the base b by 2
+we use b by 2 because the blocks may not be full like as we saw here
+the root only has one entry where it actually has space for three entries and four pointers so leaf
+has space for four pointers it only has two pointers and this node has a space for four
+pointers it's only using three pointers and so on so they might not be full but we do require them
+to be at least half full so if there are four pointers we require that at least two be used
+okay obviously four and two doesn't make sense if there are space for 100 pointers we require that
+at least 50 pointers are used okay otherwise the b plus tree is considered under full okay
+and and potentially subject to reorganization
+another thing to keep in mind for b plus is the way the reason they work very well is that the
+remember that a database typically only has a small number of relations right even if it
+has 50 relations it's still relatively small it may have hundreds of indexes the top levels of
+the index are often in memory because they get used so frequently every query goes to the index
+so the top levels because of the locality properties the top levels of the index are
+often in memory which means that the number of actual accesses you do is even smaller than that
+the root of all the indexes you might as well just keep it in memory doesn't really take that
+much space just the root okay and maybe the next level as well just keep them in memory so
+typically because those levels are in memory the actual time per request is even smaller
+example b plus tree what we just discussed root internal nodes leaf nodes there is one exception
+to the under full rule the the rule that requires every node to have at least half the pointers
+and that's the root root is actually allowed to have even just two pointers that's acceptable
+there is no way to force that like that's that's too complicated doesn't make a lot of sense so
+root can actually have less than half root can be less than half full we are okay with that
+everything else must be at least half full
+when inserting and deleting so in the past we have actually gone through the algorithm
+but i'm not sort of doing it anymore a primary reason for it is that b plus trees have fallen
+out of favor in in modern systems okay modern systems use something called log structured merge
+trees or lsm trees pretty much all modern systems today if they use indexing the other use some
+form of hash indexes for in memory or they use lsm trees for on disk indexing okay so i think
+b plus trees is important to understand but i also don't see a point in going through full
+details on their algorithm so we'll discuss the algorithms intuitively at a high level
+but not the detailed algorithms themselves and we will talk about lsm trees which i started
+talking about discussing in like last time i taught this while inserting or deleting
+two properties have to be maintained each block must remain half full and the tree must remain
+balanced and and same we do with deleting as well okay so here's what some examples of inserts
+look like yeah so what's happening here is what did i do here insertion of atoms in b plus tree
+okay so that's my b plus tree okay that i started with i'm ignoring the pointers at the bottom
+because those are not that important so we'll walk through this example we just won't don't
+walk through the entire algorithm in detail so in this case we want to insert atoms okay
+atoms needs to go here it's smaller than brand so it has to be in this node but this node is full
+it already has three pointers okay so this this pointer is actually off this pointer should be
+here it's a mistake in the book so this has already has three entries so it doesn't have
+any space for atoms okay so what we're going to do here is we're going to basically split this
+into two nodes okay so now i put adams and brant in one node california and creek in another node
+because i did this i also have to modify the interior node to add in one extra pointer in
+there okay so that's the that's the modification that happened when i tried to insert atoms into
+that index i ended up with one extra node adams and brant or this one one of them is new
+i think it's actually this one that's new and i ended up adding an extra entry here which did
+not exist before because i need to separate differentiate like i need to sort of direct
+traffic between these two so i added one extra entry in here
+so the property is that anything less than california goes here anything more than california
+goes here so you will see that everywhere you will see the same thing this one is
+einstein this one is gold the below srinivasan is here above srinivasan is here so we're still
+maintaining that property that we have greater than equal to in this side so greater than equal
+to follow this pointer less than follow that pointer make sense i'll leave this up for a
+minute because basically i'm going to walk through a few examples like this and that's to the extent
+i'm planning to discuss b plus tree updates any other questions on what happened here and why it
+happened now obviously the real algorithm also has to deal with the possibility that this node
+is also overfull so that also might need to get spread and eventually if everything all the way
+to the root is full then you might actually end up creating a new root and thereby increase the
+level of the tree that's going to happen very very infrequently like extremely infrequently
+but the algorithm does handle that case
+any questions
+here's a question for you could this here be
+i'm just making up over here so could this here instead of srinivasan srinivasan be small okay
+would that be okay
+okay
+and what would be a problem with that
+all
+okay so one obvious issue is that we don't actually have a small as an instructor in the
+relation anywhere but is that a problem for the index
+so the point of this search case is to simply direct traffic and small currently can direct
+traffic as well as srinivasan can everything before small goes here above small goes here
+it's perfectly fine search keys don't have to exist in the relation there is no requirement
+that's the only point i wanted to make that is that the search keys do not have to they have
+to follow the requirements on the ordering but there is no requirement that the search
+keys belong to the relation itself
+we're going to do another insert here so
+whatever is it lamport okay lamport has to be inserted gold it needs to go in that node there
+okay gold cats came as a case so it actually after came that node is full so lamport has to be
+like we have to result in a in a split okay note that you will actually notice that there
+is some extra space in the previous node what i could imagine doing is i could imagine moving
+gold into that node and add lamport into this node okay there's some variations on b plus trees
+that might try to do that okay what they might say is that you know what lamport needs to go
+in here there is no space here but there is space here why don't we move gold here and then have
+cat scheme lamport here i'll need to change this key this can't be gold anymore but it's doable
+now most b plus tree implementations don't do that because inserts are pretty common like inserts
+are more common than deletes so it doesn't really make sense to do extra work while doing the insert
+just go ahead and split because if you don't split it now you're going to split it in another minute
+okay so might as well just go ahead and split it now so in this case we split it gold cat scheme
+we created two nodes gold cat scheme lamport two nodes this required adding something here except
+this is also full so this is going to get split and after this got split i added a new entry to
+the to the root okay and and now i'm done okay so this was a more destructive update because now
+it involved me changing essentially add a new node here add a new node here and make a change
+to the root question deletes work the opposite way okay so if i have this and if i'm deleting
+let's say cats first of all deleting cats there is no issue okay because that node has has three
+that index node that leaf node has three entries it needs to have at least two so i can delete cats
+and there is no issue okay deleting gold okay so this makes the same point i just made
+if i delete gold from here you might say i should delete it from here also but there is no reason
+to do it gold here this gold here is only there to to direct traffic so i don't really need to
+change it as long as it's not causing any problems i don't need to change this okay
+purpose of the search case is purely to direct searches
+what about deleting singh and woo from here both of these well now after i've deleted both of them
+this node is now under full so i have to do some reorg here so what this is showing here is a
+little bit of a reorg between this node and this node essentially a redistribution so that both the
+nodes remain full half full okay so in this case what's ending up happening is that i have singh
+and woo are gone i have mozart there i sort of borrowed kim from this node into here so now both
+of them are half full as a result of it i have to change this search key from mozart to kim
+otherwise this would be wrong okay so this type of a redistribution is also done
+depending on the exact implementation of b plus tree you might or might not do it but this is
+common minor redistributions that only involve nearby nodes is acceptable
+another example of a b plus tree delete the gold this would actually be a more involved
+change because because of this so i'm removing gold from there
+remove gold from there so now i if i try to merge cat scheme and mozart as i did here
+the interior node above that becomes problematic okay so i won't go into details of this but this
+is an example where i actually reduce the size of the tree because essentially in order to keep it
+under like the 50 full property i have to get rid of the entire node and as a result of it i
+also have to get rid of the root itself okay so this is an example where i went from a three level
+tree to a two level tree after deletion of gold now modern trees will almost never like most
+implementations will never actually do this again inserts are more common than deletes so
+we will actually live with an under full tree for a while in the hopes that new tuples come in
+and fill up the gaps okay but that's like an engineering detail technically the b plus tree
+deletion algorithm will require you to reduce the level of the tree
+so the benefits of b plus trees is that they reduce the number of block accesses that you need
+dramatically and b plus trees were originally proposed in late 70s they exist even today they
+exist in many database systems and you know that sort of the algorithms and techniques for them
+have been developed like long time ago but they're still quite common b plus trees as i mentioned
+modern systems are are built using lsm trees which we will discuss a little bit later
+and as i noted in that list of topics the questions on b plus trees that you can expect
+would primarily be around like you know simple insert deletes and validity of a b plus trees
+that because we are not covering the algorithm in detail we won't really be asking questions on that
+i kind of because of the way we did this i skipped over
+some early slides so let me just cover those quickly
+basically an index is a you know these are again going back a little bit index is a any kind of
+data structure that's used for efficient searching and they can be sort based or they can be hash
+based so b plus tree is a sort based index search key for an index is the attribute i'm searching
+on okay so ssn for a person's name or id for instructors and so on based on whether you are
+using ordering or hashing you can have ordered indexes or hash based index right and the best
+analogy for indexes still remains the library index right like if you if you use libraries
+the way you would search the library is you know it's actually called an index as well
+very very similar ideas and ordered index we talked about primary versus secondary indexes
+in a primary index the relation is sorted by the search key in a secondary index it's not sorted
+so this is an example of a primary index this index here is a very simple index not a b plus
+three but the precursor to b plus three it only keeps track of sort of periodically keeps track of
+every fifth entry one zero zero zero one three two three four three seven six seven six six
+using this i can quickly go to the part of the relation that my data belongs to it is an example
+of a primary index okay we can only have one primary index on a relation okay another benefit
+of a primary index is that it can also be sparse because every key so every search key
+is not present in the index the index can be much sparser which reduces the size of the index
+dramatically by factors of hundreds okay so so primary sparse indexes are b plus three is an
+example of a primary sparse index they are you know they just make a lot of sense we just build
+them in that posse scale won't even wait for you to ask it just will build b plus trees or primary
+keys just by default okay other indexes you have to explicitly ask posse scale to build them if you
+want to build a secondary index you actually have to ask posse scale to build it for you
+but primary indexes it will basically just build them they just they are low cost they just make
+sense dense index is the opposite of it every key must appear in the index so the index can
+become pretty large so this kind of an example of a dense index there is no specific benefit
+to this index but in general like secondary indexes have to be dense okay so this is a
+secondary index the index is on salary the relation is sorted by id so my index here is
+sorted by salary but because the relation is not sorted by salary there there are pointers all over
+the place okay that's the reason it's a secondary index so i end up like every key must be present
+in the index and i will end up with a lot of random accesses okay so it must be dense so sometimes
+the words get confusing there is also a word called clustered index but which i'm not introducing
+here the words get confusing the the key ones you should remember is primary versus secondary
+that's a that's the most important one primary means if the index is on the same attribute on
+which the relation is sorted secondary means that the the search key in the index and the relation
+are sorted are different like the relation is sorted by one attribute the search key is another
+attribute so that's the primary lecture that's a not to overuse that word but that's the main
+distinction to keep in mind primary versus secondary the sparse versus dense is a less important
+there's actually just pointers like this here is a is a remember we talked about record ids
+like the pointers to the disk blocks you know these are these are essentially pointers they're
+saying where should i find a tuple so it's a pointer on the disk of some form like a block number
+plus position within the block all of these that once we show as pointers here even these
+these are essentially block pointers or the record point that they're telling us where to
+find a particular record so that typically block plus position
+if you want to yes that's usually too expensive but typically what you do is and this is a job
+that typically database administrators have done based on the query workload they have decided what
+indexes make sense today there exists some automated solutions that will sort of decide
+for you but they're still in development somewhat in cloud compute in cloud computing world
+especially automated techniques have become more and more common but in the past you go back two
+decades the database administrators made the decisions primary keys you always build them
+primary indexes you always build them secondary indexes the database administrator has to make
+a decision because there is a cost they have to be kept up to date and update keeping them up to
+date is not cheap any other questions we already talked about this this multi-level indexes but
+just this is the last slide i have on this topic so this is kind of the this is my relation i have
+one level of index then i have a second level of index exactly like how b plus 3 is okay but
+the generalization of that is a multi-level index if the index itself is too big then you create
+another sort of index for an index and that idea is what b plus tree also has so b plus tree is a
+multi-level index but on top of being multi-level it's also ordered and balanced you can have a
+multi-level index that's not balanced b plus tree is a balanced index all right so there are no
+more questions we can stop here we'll next week we'll continue with some of the other indexing
+stuff including including lsm trees and once again exam on thursday

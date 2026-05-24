@@ -1,0 +1,483 @@
+ So we'll continue our discussion of query processing optimization today. But before I do that, any questions or
+anything else, comments? Have you started?  So, I said, I mean, slides been posted. These slides are posted, yes.
+Nothing.  And we're in the morning. Anything else? All right.  So, um, just to kind of recap, uh, we are now going
+through the discussion of uh, how very processing engines are actually built. sort of the steps in the steps that we're
+going to do. We've talked about play plans last time, and I'll briefly review that, especially the hydrator model. And
+then we'll, today we'll uh, uh, start going through the implementations of operators.  Hopefully we can cover these, but
+let's see, these two. And then we'll next class, we'll start talking about the next issues. We'll talk about what
+happens when we have a large data sets that exceed the amount of memory we have, and we'll talk about query
+optimization, how to find the best query plan for a new inquiry.  And then we'll talk about what happens in a parallel
+or distributed system like Apaches Park or a, you know, a big data warehouse to some extent. Not the topics will go too
+deep into, but we'll talk about them briefly. Okay.  To recap a couple of things we talked about last time, we discussed
+the notion of query plans, and a query plan is nothing but kind of a chain or a tree of operators, which at the bottom,
+we usually draw in bottom up, like the base duration at the bottom and the result at top, but you might sometimes
+flip it or do it sideways and so on. The acquitted plan simply shows how we are going to take the relations we have,
+the base data we have, and executive the query on top of it. How do we combine it, join it, aggregate it?  And as an
+example, we saw this very simple query plan which has a selection followed by a join, followed by a projection. And
+since we when we talked about many languages, we also talked about the sort of more pipeline query languages, like
+the Spark or Mongo DB. So if you kind of have that clear in your mind, the operator 3 essentially looks like a
+pipeline.  It's just like a tree, but mostly it's almost identical to a pipeline. The other key thing we talked
+about is the fact that in a database system, the operators we have, which I call physical operators, they are often
+different from the logical operators. And there are many reasons for it.  But this is the actual operators that will
+instantiate in post-grass, because the query plan that possesses your outputs is literally just a list of operators
+it uses. Okay? And those operators are going to be the physical operators it has.  And in this case, for instance,
+there is a sequential scan operator, which is oftentimes not an explicit operator, but might be combined with the
+next operator. There is a hash operator which builds a hash table, we will see why today. And then there is a joint
+operator, which does the joint using the instructor relation and the hashtable.  Okay. So one of the key things that
+I want you to take away from this discussion is the ability to read query plans. You may not be able to fully
+understand it.  We saw some query plans last time, which just looked very complicated and they had this data flow,
+like the flow, the data going back and forth, which wasn't very obvious. But at least for simple queries, somewhat
+like, you know, nothing too fancy going on, like sub queries or width classes, you should be able to read them. And
+then as you get, you know, if you really need whatever you are doing, the projects you are doing are, and I don't
+mean in this class, but later on, in your job, if you need to read them better, you'll figure that out.  Right now,
+my goal is to make sure you can understand the basic query plans on how to read them. And later on today, once we do
+the review, well, basically going to start talking about the physical operators, where we'll talk about how these
+operators are actually implemented in a system like post-rescure, and more generally. Any questions so far?  Now,
+one other thing that's going to be important for us, uh, for today, is this, um, The notion of uh, uh, an iterator
+model. And I really should change these slides because iterator models are not specific to pipelining. In fact, that
+is how post-priskure and many other systems implement operators at all, whether it's by planning or materialization,
+that's how they influent operators.  It a software engineering practice more than anything else. It's a way to make
+the operators more composable. So the phenomical idea behind the iterical model is that each operator, the fiscal
+implementation of an operator, will have 3 calls.  We are simplifying a lot here, but you know, there is enough to
+understand what's going on. It'll have 3 calls. It'll have an open car.  It will implement an open car. the next
+call, then you'll give it a close call. Like in a python, for instance, we might have an abstract class that defines
+these 3 functions and then select sort of subclasses that, okay? And then select needs to define its own open next
+circles.  And the semantics of the way we use this is this is this is demand driven. What it means is that the
+execution will be driven by the top operator. So in particular, when you say, show me the tupulse, it will make a
+call to this operator.  That operator will return by calls to its children, child, that child will make calls to its
+children and so on. And these calls will be all be made using the next function. Open and close are to set up and
+destroy all the data structures.  Next is the sort of the logical execution that's happening. And so the next call
+is the one that we largely focus on. So in the next call, the 1st call and next to buy them, it says, okay, the my
+parent note or my parent, whoever it is, is calling for the next 2 person.  Let me see, let me get that people from
+my child. And that child says, okay, let me get that from my children. That one says, okay, let me get that from my
+child.  And eventually you end up at the relations and the relations have the tuples. Okay. And so then, at that
+point, the two parts will flow back up.  And of course, in order to join, you kind of have to find a matches and all
+of that logic is going to happen the next call. Okay, we'll talk about examples of this sort of throughout rest of
+today. Any questions on any of this?  And again, you can ask me more questions after we go start going through the
+implementations. Okay. open open as I see this has for this slide open openens everywhere. Correct. you need one
+open so open everything or you have to open every single time.  So every operator open is used by the operators to
+initialize their state, whatever they need to do. And so that's why the open call has to proposate from top to all
+the way to the bottom. For instance, if these are implemented as files, if the relations at the discard files, the
+open call will open the file.  Okay, but won't read it. It will just open it. The hash joint, if I'm using a hash
+joint here, then I would create the hash table, but I won't like build it.  I will just create the data structure. I
+will say new hashtable. Okay.  So those are things that are happening at open, so that's why every operator has to
+implement its own open. And then they have to make sure they call the open on their children so that the children
+can also get initialized. Everyone needs to get initialized before we can start the actual processing.  And same
+goes for clothes. Close is the opposite of open, we sort of close everything. Any data structures we have, we try to
+destroy them.  Most skill has a really nice way of dealing with memory. It allocates a large chunk of memory for the
+entire query plan. So you don't see the, you don't see delete in in post-grass cure, right?  It will, like, if it
+created a hashtable, it will not destroy that hashtag. What it will do is, once the query is done, it will
+essentially throw away the entire memory context. Okay.  So it has created this large memory to execute a particular
+query, and once a query is done, it will just throw away that memory. And that's crucial because individually
+deleting things is very expensive. And there's some some of the nice things that Poseriskill does.  And other, I'm
+sure other databases do as well. In many ways, postguest collection has its own memory manager. Okay, what it does
+is it gets the, it gets the operating system to give it a large chunk of memory, virtual memory, and then it manages
+within that and then delays the whole thing.  Any other questions on this? So let's jump into the some of the
+implementations. Um, Actually, before we do that, there is 11 topic that I don't need to cover.  And that's a topic
+of cost. Okay. Throughout this discussion, not in a ton of detail, but somewhat.  We will talk about the cost of an
+operator. We will need this for ultimately doing the query optimization and so on. If you remember, when we were
+looking at PG admin, you still have it open.  Yeah. When we were looking at easy admin last time, Yeah. When we were
+looking at PGRL last time, it had a cost at various points.  So it estimates, and if I do, I'll explain, analyze, it
+will show me the real costs as well. So you can see that it has the estimated cost and it has the real cost or
+actual time. Cost is a measure of, you know, whatever we're trying to optimize for something, right?  We're trying
+to do it in the best way possible. The only way to do best is to have a definition of what we're counting, what
+we're measuring. And that, what we're mentioning is what we're going to call cost.  Now, the problem with databases,
+and in general systems, is that cost has become incredibly complicated to calculate. In a long time ago, in the
+earliest databases, you kind of use one number. You sort of talked about the number of blocks you read.  How many
+blocks you had to read from disk in order to execute the query? And you were kind of done. That was your metric.
+ The query plan that our query plan plus techniques that minimize the number of blocks you read was the best one.
+Today, we have to worry about so many different things. Let me, what is my power point?  Um, Today, we have to worry
+about CPUs, instructions, we have to worry about number of discires, how many blocks I'm reading, whether it's
+sequential or random, how much network I'm using, how much memory I'm using, uh, modern high performance systems
+worry about things like cash misses, uh, how many, you know, caches are missing and this. There is some really deep
+work that even looks at issues like how many times you have to do context switches in the CPU registers. If you are
+trying to get the best performance out of your system, of your hardware, you can have to worry about many of these
+things.  Okay. So today's cost calculations have become relatively complicated. Um, you, and another challenge is
+that you want to make sure that whatever you're optimizing for is actually the bottleneck.  Now, if you have a tons
+and tons of memory, you don't really want to care about memory as much. okay? If you are using SSDs, maybe you don't
+care about random versus sequential as much. If you have an insane, if you are in data center, and you have like a
+really fast network, you probably don't care about the network.  So you need to know you need to know what you
+actually care about. Okay, that's another thing that makes this challenging. So typically what we see, um, is some
+sort of a weighted, uh, uh, uh, metric.  What you do is for each query plan, let's say, let's say I'm trying to
+decide between two, 3 query plans. For each query plan, I'll I'll estimate the number of amount of memory it uses,
+and I'll estimate the amount of discires it uses, and I'll do a weighted some of those too. Something like that.
+ Okay. Generally speaking, in the, in the, uh, uh, databases, we, most databases typically look at these 2 things.
+So how much CPU you are using, like how much CPU a query plan uses, and how much disk IOS it uses.  And that
+combination of those 2 is what it tries to optimize for. But this question does not have a very simple answer.
+Depending on your setup, maybe you are an in memory database.  If you're in memory database, you really don't care
+about this guyos. Okay? Cash misses become much more important for you.  Because, you know, in memory database, the
+assumption is that the database is small enough or the memory is large enough that the database fits in memory. And
+as a result of it, this is unimportant. Network is unimportant because these are usually single machine databases.
+ So what I care about is the, is things like cash misses. So it, the, the, the issue of deciding what to optimize
+for is an important one, and then given that, you know, then the next, next steps follow. We're talking about cause.
+ This is, like, the cost, like, for what, exactly? Like, to make a break, or to... To execute the question.  We do
+care about the cost of optimizing itself, but that's a separate issue. This is about cost of the actual query
+execution. Um, so what we do is, uh, we buy and let are going to focus on the amount of uh, disk blocks you need to
+process, so we'll simplify things a little bit.  We'll try to calculate for every operator that we look at. We'll
+try to calculate how much how much this blocks it ends up needing to read from the disk. And in some cases we'll add
+in the CPU costs as appropriate.  Okay? This is simplification, but what it works, and it should be okay enough for
+now. The textbook, if you were to try to match what we discussed with textbook, textbook uses a cost function that
+differentiates between random iOS and sequential iOS.  The textbook still focuses on hard disks heavily, and as
+we've discussed a couple of classes ago, in hard disks, random IO versus sequential IO, there is an extremely large
+gap, like a factor of 1000 or more. And so they care about whether you are IOS are random or they're sequential. So
+we are going to ignore that for now.  Um, All right, so let's start talking about updated implementations. Okay. I'm
+going to do a combination of pseudocode and something in between.  There's not how I've done in the past. So if you
+did look at slides from previous years, just make sure you sort of look at the latest slides. A very simple
+selection operation.  Select star from person where SSN is one, 2, 3. This is what the implementation of that of a
+select operator might look like using a sequential scan. Okay, so we're just scanning the relation start to end.
+ Very simple. And let's make sure we understand this, okay? Because everything from this proton builds upon this.
+ Um, the open call. The open call simply opens the table. Okay.  So in this case, uh, it's using a table scan
+operator, it's a table stamp function inside. So let's assume that table scan might be reading a 5 card person. So
+the open call, all it does is it opens the file.  It really depends on exactly how the data is stored, but you know,
+one way it might be is that each table, like person, is a separate file. Then, in the next call, Remember, the
+definition of the next call is that when you call it, it returns you multiple. Not five, not zero, well, it can turn
+zero, zero is the end of output.  But the its goal is to return one to people. Okay. Unless it does not have any
+tuples to return, at which point the execution stops for that operator.  So this is a very simple next call. It
+looks at the next tupel. Uh, if the next Tupal is, uh, end of, like we have every stand of five, it returns end of
+five.  Uh, and then if it does have a tupel, it checks whether the tupel is uh, one, two, three. SSN is one, two,
+three. And if it is one, two, three, then it returns it.  So very simple implementation. I'm going through this step
+by step because it does get complex quickly. So I want to make sure we are comfortable with this before we get into
+the more complex ones.  Any questions on this basic studio? Other way, you, like, I used to have a python-based
+programming assignment for this course like 10 years ago. The code for many of these operators is literally like
+this much in the database.  And it's a functional database that can run queries, not very well. It's written in
+Python, so it's not really going to be fast, but it could run quite simple queries. And the entire source code for
+that single query was for that toy database was like a few 100 lines of code.  And then the clothes will go ahead
+and close the scan. Okay. Whatever, if there is an open file, it will close the file.  Make sense? Any questions?
+Simple enough.  Now, I can't hide this in my core business, right? This is one question. So I'm gonna have to, you
+know, parameterize this a little bit.  In this case, the parameterization is relatively simple. The open call will
+modify that to include a table name. attribute position, and explain what that is. The operator we want to execute
+at a constant.  So this can handle predicates like A equal to 5 A greater than 5 B equal to B less than 6. things
+like that. It can handle a variety of different operators in a single core base. And now, in a table stand, instead
+of opening person file, open the table name.  And then, In this case, I'll outsource some of the complexity of
+evaluating different operators to a helper function called valued. This evaluate function, in turn, will take the
+operator. The, the value of the attribute for that purpose, so deep pause is the value of the attribute for that
+position.  And then you take the constant and then return yes or no. Okay, return to our false. So this is a simple
+way I can take that code ahead and just make it make it work for arbitrary. arbitrary conditions that involve a
+constant.  Okay. So this cannot do A equal to B. Okay, because one of them has to be a constant, but it can do equal
+to five, a less than 5 a greater than 5 and so on. It can also have the different data types.  So T-Pos here could
+be a string. Now, if I'm doing an equality on string, that's gonna look different than an equality on integers. So
+that will have to be handled inside of this evaluate by sort of having case, a case, branches.  Okay. So case
+statement on the operator and the data type is enough to handle these a bunch of different operators for a bunch of
+different data types. And this is the kind of code you will see in post rescue.  Okay. So if you were to go dig and
+ignore all the sort of stuff that's required but not essential for the actual query processing part, This is
+fundamentally the code you will see in a system like Puskisk. Any questions on this?  This makes sense? Now, in the
+rest of the code, I will not show these paracterizations. The cold gets too complicated.  Okay, but just keep in
+mind that whatever code that we see from this point on, um, um, can be parameterized in this fashion to handle, you
+know, different relations, different positions, different data types, and so on. The cost of a sequential scan
+operator, which is simply scanning the relation statue and is going to be, if I'm looking at the number of blocks it
+read, that's going to be the number of blocks of that relationship. So if the relation is spread across 100 blocks,
+that's my cost here.  The CPU cost will be order of the size of the table name. The problem here is that I don't
+know what the constants here are, you know, like the CPU cost, if I'm measuring the instructions, I cannot need to
+know how many instructions each of these things is gonna take me. So that's hard to easily write down.  So it is
+that we're taking, like, one big, like, I guess, query or instruction, and we're breaking it into 3 different words.
+For the for the implementation purposes, yes. But really, the primary one we care about is the next one.  That's
+where all the processing is happening. I guess my question is, can this be like condensed into like one like sort of
+fery? Is this like an expansion or is this a?  So this is the code to execute this query. The query is this one.
+Okay.  And this executes this very simple query with a single operator. Generally speaking, I have a pipeline of
+operators. I love multiple operators.  In this case, I have a single operator to execute this squarely. Okay. So,
+the cost would be the comfort of times.  Um, for the CPU cost? Yeah, basically. We have to have like the actual
+constants around it is order are they're harder to estimate you.  People make the, in the data systems, you will see
+some numbers they just use kind of some standard numbers that they use for these purposes. One of the things to
+remember is that we only need these costs to be relative to each other. Like we don't need the precise time.  We
+just need to be able to compare to implementation. So as long as the relative costs are Correct, we are kind of
+good. And that's why, like, kind of approximations are okay.  It doesn't need to be precise. You know the questions
+on this? Okay.  Now, we may have a B plus three on SSN. Okay. So, if we have a bootless stream, we have a 2nd option
+here.  Sequential scam was one option. The 2nd option is to use the B plus three. So using the B+3, the code kind of
+might look something like this.  Okay, very high level code. So here, I opened the people street. Okay, so this
+weekly look up coding code again.  There is a bunch hidden here, but discord is supposed to look up the tree and
+find the tupal with K equal to 123. Okay, so in the, in the lookup itself, it actually finds the find fit to put,
+and then the next call on this index will give you the next step that matches. Okay, so this simplifies the code a
+little bit, but with a B plus train, this code is, again, ideally a lot faster because now instead of scanning the
+relation start to end, I'm able to quickly go straight to the to the tupel that matches.  Okay. So in this case, I
+would be able to go straight to the Tupel with SSN equal to one. And if I do have a B plus tree, the cost is much
+lower.  As long as the B plus tree is, you know, the number of duples I'm returning is small. So in this case,
+there's only one tupel I'm going to return because SSN is, you know, expected to be a key for this duration. So the
+number of blocks, right, is going to be the height of the elect.  Remember, the B plus 3 has a height. Um, So it's
+going to be the height of the index +one. So here's an ignore the top part here.  I just have an example of the B
+plus tree. If I'm looking for, let's say, Mozart, the cost of that is I have to read this lock. I have to read this
+lock.  I have to read this block, so that's the height of the B plus three. Plus, I have to go and read this log. So
+that's where the 4 comes from.  The height of the index, which is 3 plus one. Okay. And now, of course, there's a
+secondary index.  There are multiple Mozarts. I would need to read multiple blocks from the relation. So the cost
+calculations get a little trickier or not, they're not trickier.  They're just tedious and hard to write down. In
+the book, you will see this big table with 8 separate cases and the formulas for each one of them. I don't care for
+you to memorize the formulas, but if I were to tell you, estimate the number of blocks here for a query, you should
+be able to do that.  Okay. Because that's the foundation here is that the fundamental thing here used to be able to
+walk to sort of walk through the fold of this or walk through the process of finding all to persuade a neighborhood
+to Mozart or sing. and then go through this and figure out how many blocks you have to read. So, if the new one, the
+most first, I'm gonna say those two Mozarts in that the bottom table, will it be +2 instead or still plus?  Plus
+two. So this one here was assuming that we are doing a primary key lookup or a key lookup. So there's only one
+output.  But for a, for a secondary index, we have to, or even for a primary index, but if the number of results is
+larger, you have to do multiple multiple block fages. But it does get a little bit trickier. For instance, this
+election is sorted by I. Okay, and if I were to do a range query on ID, um, using an index like this.  So not this
+index, but using a separate index that's on ID. And if I were to do a range query, even if I'm returning 10 to
+pulse, those 10 triples are all consecutive. So I will not be reading 10 separate blocks for it.  I'll be reading
+fewer blocks. Because they are consecutive. That's a question.  And these are the calculations that you do have to
+do in the core base because these are different cases that do have to be considered. And so if you go to the book,
+you will see, as I said, a table with like 7 or 8 separate cases and a formula for each one of them. I think trying
+to remember or understand this formula is not really helpful.  What you need to be able to understand is how those
+formulas came to be, and then you can take that and generalize that to other settings. This is especially important
+today because today we see so much diversity in the index structures that that formula in the book is not going to
+apply. For most modern database systems.  Because modern databases use very different index structures than the
+databases from 30 years. 20, 30 years ago, every database had the same index structures, but that's not true
+anymore. So this is a secondary index, and if I'm looking for all instructors with name, let's say name S, if I'm
+looking for all instructors with name S, I would come down here, and I have 2 of them. I have to go find Sim, and
+then I have to go find Shinivasan. 2 separate, one is here, one is here.  So these are random accesses. I'll be
+going here and I'll be going there. Yeah.  Any questions? We talked about Ellis, uh, lock structured merch, please.
+The lock structure most please.  I'm going to have a different calculation altogether, if I'm using them. If you
+remember, the steps in log structure merge tree is that we 1st look at the in memory SS table. If we find it in
+memory assessable, we are done.  If we don't find it immediately accessible, we have to start going through those
+levels. Okay. And so calculating the number of or calculating the cost of using a data structure like this is going
+to require a little bit of work.  I'm not going to go through that. I'm just highlighting how you would work out
+that one. You would have to work it out by estimating what is the chance I find it in memory, then if Ajemi, I don't
+find it in memory, how many of the sorted runs do I have to go through?  Those are the estimations you would have to
+do in order to be able to estimate the cost of a lookup using a LSPM. Okay, MS empty. Any questions?  Hi. Uh, just
+briefly, uh, before we jump into joints, uh, selections with ranges are very common. So it's very common to say find
+me all accounts with balance more than 10,000 or 100,000.  Uh, and so on. The sequential scan can always be used for
+any credit. Sequences can allow you to look at each tuple one by one.  So whatever predicate you have, I can do it
+using sequential scan. But you could also use an index if I have an index on the right interview. So if I have it on
+ballots, I could use it to answer this question.  If I have a index or match it, I could use it to answer this
+question. Okay. And again, as I just discussed on the previous example here, a range query here, a S, finding all
+instructors with MS, requires random access into the relation because those S 2 cars are spread out.  So you have to
+be careful if you are using a secondary index. So range query with a secondary index is usually not a great idea.
+Because a secondary index requires you to go jump around in the relation and that can get expensive.  Yeah. Um,
+multi-attribute selections can also be handled without too much issues. So if you have things like A, equal to one
+and B, equal to two, again, sequential scan is always possible.  If you have an index of A, you can use that to 1st
+find duples with A equal to one, and then apply the B equal to in memory. You can also do index ending, which we
+discussed in a previous class, so I won't discuss that here. You don't really interchanning is common in databases.
+ It doesn't really require a separate operator. You can do it as part of the index operator itself. Next, we'll talk
+about joints, which will probably take us the risk, maybe not.  Let's say, arrest of the class. The goal of the join
+is to find matching to pass. Okay, so the technology here is important to get comfortable with, but we are trying to
+find pupas that match, that join.  We'll primarily talk about equity joints, but we'll also talk about queries like
+this, which are not equal joints. So again, the goal of the joy operator is to find all matching pupils for the 2
+relations. The simplest algorithm for joints is really simple.  It's the nesting loose joint. You go through every 2
+parin R, you go through a typical S and then you check if the condition is true. Very simple 2 loops.  If the 2
+relations are files, I can simply, you know, open the file, go through it, open the file, go through it, and just
+loop through the 2 of them multiple times. R, I only look through once. S, I look through many times.  So I have to
+be a little bit careful here because this is going to be expensive. The cost of this, especially the computational
+cost of it, is going to be in our times NS. If NS a number of relations, a number of couples in R, and S is a number
+of people say S, then these two loops are going to be NR times NS.  Okay. National loops can get, they can grow up
+very quickly with 10,000 to plus each. We are talking about 1000000000 instructions. 10,000 to plus doesn't sound
+like a lot.  But 10,000 times 10,000 is 100 million. Model computers will struggle, like even this laptop will
+struggle to do 1000000 instructions. Okay. 1000000 is kind of comfortable for these laptops to do quickly.  They can
+do it, like it takes time, but 1000000 is will be quick. 100 million, you will be waiting if you get this, if you
+get this computer to do a loop in, uh, uh, that's that's a 1000000 loop, it will wait. Okay. You'll be waiting for
+some time.  And 10,000 is, but not particularly large. We are talking about relations with 1000000s of tuples. So
+this is, no, it exists.  It's there in the database implementation. The database system has to be extremely careful
+in using it. It only uses it when it's sure that one of the relationships is very, very small, like a few tuples.
+ Okay, which is surprisingly common. The relation itself might not be fuel to pills, but you often have selections
+on the YouTube offer have conditions. You might have and R dot B equal to 10.  Okay. So R itself might be a 1000000
+to pulse. But our would be equal to 10 might only be 5 couples.  So at that point, this becomes feasible. But as it,
+as it is without any conditions like this, you would never use nested loops joint. Now, a distinction between a
+physical and logical operator again comes into play here.  When we were looking at post-guyscale yesterday, we
+actually saw our last week. We actually saw nested loops being used quite a few times. If I still have the query.
+ So you saw it being used here. If someone want to say why this was okay, even though I didn't really have a
+particularly selective, uh, selective condition here. Take a pause and see, literally, think about this query.  Why
+is this necessary looks okay, even if the relations are very large? I know that it would have picked it, even if I
+did not have this condition. I could get rid of this condition, and I suspect it will probably still pick it.  Oh, I
+guess not. We also did the... Okay, um...  Anyone? So, I think that this is okay because we're already liating.
+liiming the amount of I make my states It is, but that's not the only reason. There's also, this is also not the,
+the, uh, algorithm that we just saw.  It's not It's not this. It's actually not this. Does someone want to?  Anyone
+thoughts on why it's not the same algorithm? Even though it does say, nested look in our drawing here. And the key
+here is to look at the inputs here.  Not that one input is a relation. The second input is an index. It's not a it's
+not a relation.  So this is, in fact, not this algorithm. Okay. It's not doing this.  It is going through every
+tuple in takes. So it is going through every topple intakes, but it is not going through every topple in S. So the S
+is, the 2nd relation is the student here. So it is going through the entire takes relation to pull by Tupel with
+this condition.  I think this condition really takes. So it's applying this condition and then after applying the
+condition, it's going through duples of takes. But on student, it's not doing this loop.  Here that we are seeing
+here, but instead it's using an index. Think about what is the, let me clear, let me clear the income this. Think
+about what is the purpose of this?  Purpose of this is to find all 2 person S with a particular value of A. Okay.
+Because outer loop loops through articles. Now, for a given artuple, the inner loop is looking for S to pulse with
+that value of A. It's using a scan to go through it, but it could also use an index to go through it.  And that's
+what that, that, the, the, the plan that we're seeing post rescue, this plan is actually using an index on student,
+uh, uh, the, the, physical operator core is still a nested loops, but instead of uh, uh, doing an actual loop on the
+2 relations, it's it's using an index. So for every rowing takes, we have a range query operations, right? Equality
+actually, but yeah.  Yeah. And equality of, because we are looking at, um, It's a natural joint. So natural joint
+between takes and student is on the student ID.  Uh, and so it's uh, looking up uh, for every 2 point it takes,
+whatever the student ID for that takes to police, which is the name next to part time student. Okay. The
+alternative, which is what we were discussing on this, was a sequential scan through student, but instead of being a
+sequential scan for student, it's going to use an index.  So this is, again, the part of the reason I showed this is
+to this thing, again, emphasize the distinction between the physical operator and the and the logical operator. Even
+though the physical operator here is a nested in a loop joy, the logical operator here is what's called an index
+nested loop joy. Oops. is an index nested groups join.  It's a variational listed loop joint where the inner loop is
+not an actual scan, but is an index. So in this case, same quoi, let's as if there's an index on S dot A, for every
+2 per in R, we'll use the index to find S to plus with that value of A. Okay. And this works well if the if the
+index on S is a primary index, if it's not a primary index, then if it's a secondary index, then it becomes
+expensive. possibly.  It kind of depends on, you know, all of these calculations are being done by the optimizer to
+decide, should I do this? Should I do that? You know, the optimizer is making these decisions.  Okay. So, basically,
+what that we, uh, returning, has into like a list of indexes, and whatever you are, what's going through, everything
+has to see, which one is that might have no estimate. Right, but remember, S here is a relation.  So S is a relation
+with two pals. So the index is built on all the triples of S. Any other questions on this? All right.  Um... Uh,
+index and setup join has restricted applicability. Of course, you must have the index and idealates a primary index.
+ Uh, you can't do queries like uh, R.A. mass, is dot, uh, like typical queries like this, you almost never uh, use
+the index, even though, in theory, this I could handle through use of the index on A, uh, by sort of manipulating
+the ranges, but the databases just don't have code for it. Like they won't, they won't do that optimization, even if
+that optimization is clear, it's obvious they wouldn't really do that. Index nested loop joint is great for queries
+with joints and selections.  Um, because this is exactly the kind of query that we saw earlier where we put the
+condition on the ear, uh, takes out ear, and that condition reduced the size of the takes relation enough that index
+nested loops and made sense. But the moment we did not have that condition, it refused to use the index nested lips.
+Right?  It switched to using a hash joint. Think of hash joint as being more stable but more expensive. Like hatch
+joint is kind of very clear cost.  We talk about hydrogen in a few minutes. It's a very clear cost, but it's a
+higher cost. Index and estate loop joint can have a low cost and can have very high cost.  Whereas hatch joint is
+kind of very stable cost, okay? So, the delay is optimizer is trying to decide, should I take the risk of using the
+index loop join here? Because index loops join, assuming that the estimates are correct, will be much faster.  But
+then, assuming the estimates are wrong, it will be much slower. And so we kind of have to balance balance between
+those. Ah Any questions on Nested Loop genre, index, Instet Loop Join?  How's the complexity change when you use the
+index? Um, say, I don't, I just realized that I don't have the numbers in here, but um, what we can do is the
+numbers that we saw here, they can be generalized, uh, uh, they can be... Is that, I'm on this.  Okay. The numbers
+that we saw for selection, they can be used to infer the numbers for nested loops joint. So this is the inner loop,
+okay?  of the nested loops joint, right? The selection operation. So if I'm doing the nested loop, loop within loop,
+then for every people in R, I'm paying this cost for S. Okay.  But if I'm using the index, then for every triple of
+R, I'm paying this cost, yeah. So that's that's kind of how you do the calculations for nested lips, John. Yeah, I
+think while modifying the slides earlier today, I must have taken that slide out.  Another question? What exactly do
+you mean when you say index? It's a deep history.  Okay. Typically be plus three, but any index, anything, any surf
+stream that allows me to quickly find 2 specific pupils. Okay.  Whereas my goal here, for a given R tuple, is to
+find all S tuples with the same value of A. So that's a search query. Okay. So any index data structure, B plus
+free, binary tree, um, AVL trees, 2, 3, whatever tree you want, any of them could work.  Database is typically
+support B plus trees, so we focus on people's trees. Now, what if, uh, what if I don't have an index? And I suddenly
+can't do this.  Lets say my relations are too big. Okay. Well, if I don't have an index, let me build an index in
+memory.  Okay. So that's what has John is. Hi John is going to go ahead and build an index in memory.  So here,
+we're doing the same joint, RS. Actually, that should not be indented. There's no reason for this indentation here.
+ Um, Let's assume this is a smaller relation, and I'm doing the same query. I got A equal to S. A. What I'm gonna do
+is I'll read S in memory and I'll build a hashtable of it. Literally just build up my standard hashtable.  The key
+of the hash table is going to be A. Okay. So, in effect, I'm grouping together all triples of S by the A values. So
+there is a hashtable available in memory.  If I'm writing this in Python, I will literally just use a dictionary.
+Okay. And in the dictionary, I would essentially build the build this hashtable using a dictionary.  Then once the
+hashtable is built, I will go through the triple say, ah, and then use this hashtable to find a matching purpose.
+Because again, remember, my goal here is to find matching the purse. Okay.  I can find a, like, given, or given a
+2ple in R, I can find the matching 2 pulse by scanning S by using an index on S or by using a hash table on S. All
+of them are valid ways of doing that. So here's what that code looks like in Python. Okay, a Pythonish language.  So
+when we walk through this, what's happening here? The open club code here is going to build a hashtable. Not here,
+it will actually building the hatch.  Okay. So this is a hash table that we are building on on S. Okay. And just to
+remind you, a hash table will have things like, you know, so there's a simple way to think of a hash table is these
+are the keys.  And then I have the values, and the key is going to be the values of A, and then for each key, I'll
+have a pointer to a list of S tuples, right? That's what a hashtag is. And this high level has been built on S. The
+key is the value of attribute A. So for every possible value of attribute A, that I can find an S, I will have an
+entry last table that entry with connected to a list of tuples with that same value of A. Okay.  So if there are 5
+to plus, with A equal to one, this list here will have 5 esters. So this is like building a B plus 3 style index,
+but I'm building it in memory, and it only works because essence is small enough to fit in memory. Okay, all my
+memories large enough to fit S. But this only makes sense if I have large memory, which is why the earliest database
+systems did not have this, because the earliest database systems were limited by memory, significantly limited by
+memory.  And so they preferred using sorting-based techniques, because starting-based techniques are don't require
+as much memory. Hashing-based techniques require you to build these hash tables and hash tables take up a lot of
+memory. Okay.  So, what's happening here in the open clock, call is actually in the high table. And on S, so the
+hashtable contains 2 because of S, killed by the value of A attribute. Then I'm opening the article, R relation.
+ Okay. I'm not scanning R. That's gonna happen in the next call.  In the next call, now this code is slightly
+backwards here, but in the self that matches, in the very 1st call, self-guard matches is empty. So I kind of go
+down here. I get the 1st to pull up R.  For that to pull up R, I look up the matches. So for any tuple of R, I take
+the value of A for it, and I look to see if there are matching tuples in this harsh table. If there are matching 2
+puns, I can start returning them one bar.  Every, again, every next call will return a single result. So that's why
+I have to have this data structure to keep track of what matches are already been returned and so on. So, uh,
+self-card matches will contain all matches for a given R to people, but they will only be returned one at a time.
+ Okay. And so we are using simplified pop here to remove that people from the matches and then combine it with R and
+return it to the to the calling function. And that's it.  Okay. There's different ways to write it. But there is a
+pretty simple way to rent it.  Yeah. And then once I'm done with one R to pulp, I will, the self that more matches
+will become empty. At that point, I'll go ahead and look at the next article.  If an R-tuple does not find a match,
+I will just keep going to the next article. So this will keep going through all the articles and ultimately it will
+exhaust the articles at which point it can return an end of mind. Any questions?  And this basically implements this
+pseudo code here, uh, which says that you build a hash table, and then for each to pull in art, uh, use the index to
+find all matching tickles. The cost of this is significantly lower. It's a number of blocks of R because you read S
+once and you read R once.  So it ends up being significantly lower. compared to the nested loops joint. And the CPU
+cost is also much better for this. High joints tend to have good, good CPU.  Uh, CPU behavior. So overall, you will
+see high joints being used quite frequently once the relations sizes are large enough. So postless cure, you will
+primarily use harsh joints, pretty much all of these examples that we saw, I think, had some variation of harsh
+joint or the other.  So this was a high joy, this is a high joy. Uh, this had a hash joint. This one did not have a
+high joint because the sizes of the relations were very small.  Not the base relations, but these with clause
+relations. They have very small multiple number of duples. But yeah, you see from almost all of these joint queries,
+it actually used a harsh join.  Because that's the most common one. You also note that in this code here, The hash
+table is a separate operator. Okay.  Uh, and hash inner joint is a separate operator. So the code we saw just now.
+In this code, we are, we have the hash table being built inside the Hashuan operator, but that's not how post-grad
+school does it.  Pusket skill has a separate hash operator and which gets used by many other operators, and then it
+has a separate hash inner joint operator. So, It's like, post-trace doesn't make a full joint table 1st and then
+applies the condition specified in the weight clause. That'll be too expensive.  Yeah. I should have discussed that
+as the 1st that is like nested loops join, basically. So nested loops join, in effect, matches every art couple with
+every S tuple.  But that's too expensive. Any other questions on this court? Or this hash try?  Okay. Uh... It is
+cold, as I mentioned, the hair joint is built, uh, built in the open call.  Typically, we in the iterator model,
+there's a standard principle that we don't touch the data in the open call. Um, so, but again, that's more of a uh,
+principle than a requirement. And so typically, if you see post-grade scale core base, the hashtable will actually
+be built here.  So the 1st call to next will build a hash table. You will not build a hash table in the open call
+because those guys will enforces this a little bit that open calls or close calls, they don't touch data. Data is
+only touched in the next call.  And again, as I wanted to explain, the look up here into the hash table finds all
+the matches for Tupalina, but they're only returned one by one. So the mechanism that we have here. Any questions?
+ All right, so, just, uh, not to overload, uh, with things what I'm gonna do here, is I'm actually gonna jump to,
+since we spent some time on this score here, let's jump to outer joint. Okay? So, Actually.  Okay. So this is our
+inner joint S, okay? What if I wanted to do an outer jar?  Okay. So let's say I want to do R. Left, outer joint.
+ Yes. So left outer joint basically means that for a couple in R, If there is no match in S, I should return it with
+a nurse. Okay.  Because the semantics of outer joint are that non-matching to pals are returned in the output. And
+because non-matching tuples do not have the sort of the attributes from the other relation, you have to add nulls
+there. Okay.  So, How would we modify this code to do the left outer drive? Does anyone want to take a stab at that?
+It's self matches, is that the evening?  So if stuff matters is, um, where, where do I do that? I guess like I mean,
+just next to either or above or a little bit not interesting. So the intuition is right, but it does, like, you have
+to be a little bit specific about where you put the condition. again.  No. The the modification that we need here is
+that the rest of it is fine. Every tuple that's returned here, we are going to return for the left outer zone as
+well.  But in addition, if a tuple of R does not find any matches, we need to return that with nals. Okay. So this
+is the place where we have to do that.  Okay. So if self-caught matters is empty, right here, because by this time
+we have started talking, so we can't do it here. It has to be done here.  Here, right here, which is the 1st time
+they look up for matches for specific people of art. If we don't find any matches, we'll return that couple
+immediately with nulls. Okay.  There's obviously other ways to write the code, but that's one easy way to do that.
+So this is what that code would look like. So this is the only modification I need to this pseudo code here to
+handle left outer hash joint.  Remember, I mentioned last time that the actual code for these different variations
+of joints is not separate operators, and that's because of this. is that the same rest of the logic remains. The
+only change I need is if SoundGuard matches is empty, then I should go ahead and return that to Pal with nuts. And
+this code actually handles the rest of it as well.  So next time you call it, send that matches, he's empty, so you
+will go ahead and scan the next two. But of course, you have to be careful to make sure that you are not just
+returning that people, but you can progress to the next people properly, but in this code, it works out. This
+wouldn't necessarily be my way of writing this code, but you know, it works.  Questions. Is this clear? What we just
+did here?  How do we handle right outer joint? So same code. Actually, let's go back to the previous score because I
+shouldn't have that in the right after join.  What if I had the? Right outer drive. For a right after join, just to
+remind you, it's other way out for S to pass that don't find a match, I need to return those to pass.  Now, you
+might say, why don't we use the left auto giant and flip those two? But we wouldn't want, we don't want to
+constraint the optimizer. That's effectively saying that the optimizer cannot use right out to join operator.  So
+we're going to go ahead and implement a right oxygen operator. Remember, I started with the assumption that S is
+smaller? Well, let's say I want to do R right out of your S, and S is actually the smaller relation, and R is much
+larger.  Well now flipping doesn't work anymore. Because if R is much larger, I don't want to build a hash table on
+R. So, I still want to build a hashtag on S. That's why I need the right option.  And also, I'm gonna have to
+implement full outer joint. So either way, one way or other, I have to take care of the other side of this, this
+joint. So who wants to tell me how to do right, how to join by modifying this code?  Again, what is my goal here,
+right? Magolia is to find non-matching stuples. So how can I find non-natching vegetables?  Non-matching octopus is
+easy because of the way the code is written. I take it to full of art, I look up, and immediately I know whether
+there are any matching to pulse or not, right? I'm done.  Non-matching S to be like 2+ in S that don't match is a
+harder problem because of the way we're doing this. Maybe he could go away of like S tools that have to imagine
+things like we told them at the end afterwards. So the thing that we need to do is we need to track which of the S
+to pulse have been matched. as we're executing this.  We know which, we know this festival match, whatever this
+festival was that was from here, we know that matched. Okay. But the question is, which ones did not match?  Okay.
+And so one way to do that, and again, this is not a particularly efficient way of doing it, but one way to do that,
+um, Is, uh, I need a set with all vegetables here. Okay, not very efficient, we are doing it because I'm literally
+doubling my memory right here.  But let's say for sake of explanation, we'll allow this. So we create a set of all S
+to us. Every time we find the restable that match, we remove it.  Okay. And as a result of it, at the end of this
+whole thing, I will have this particular set, it will only contain those two pulse that have not matched with any
+article. Okay.  Now, in order to sort of deal with this, this code was a bit weird to modify without it becoming too
+big. So the way I did it here is I have 2 phases. initially we're in phase one. In phase one, we are sort of doing
+the normal joint processing while keeping track of the person that has not matched.  The moment we are exhausted
+are, they switch to phase two. Okay. And in phase two, And in phase two, we go through the not-matched set and we
+start returning them all down.  Okay. And again, remember, I cannot return them all at once. I still have to do my
+next call.  So this is going to be like the next call. Okay. So, uh, uh, it will do phase one, once the phase one is
+finished, Only if self-cat R is EOF, we move to phase 2, and then in phase 2, we start returning into Paswar Tawa.
+ And since we're using a variable, actually, I should have said, got phasia. So phases are variable that I'm keeping
+track of the state. And so it will keep returning the all the triples from S that have not matched one by one.  With
+appropriate amount of nulls for the R parts. Okay. So this whole core, together, will have my full outer journey.
+ That plus the inner inner modification that we made. And then. There will be a parameter that tells me which of the
+4 joints I'm going.  Am I doing energy, outer joint, left outer joint, full out to join our right outer joint? And
+the same code will handle all of them with just appropriate if conditions. If I'm doing the full outer joint or
+right outer joint, this code gets activated.  If I'm doing left auto joint or full outra joint, this code gets
+activated. If I'm not doing either of them, both of those codes are deactivated by if conditions. When I say
+deactivate, I don't mean anything.  Fancy, I just mean, the wave condition that says only executive days if you are
+doing left on to join. Any questions? Now, one thing that did surprise me last time was, Posge Scale does seem to
+specifically note hash inner joint here, and it noted hash full joint here.  So I wasn't quite sure whether progress
+cure has modified its code base since I last played with it a while ago, to actually have a, Um, So it does say hash
+full joint there. So, I need to, I, I, I want to check whether that is just something it added while printing out
+the output, or is it an actually separate operator? I don't think it's a separate operator, which doesn't really
+make sense.  There's a lot of repeated code and for it to be a separate operator. But there might be some reasons
+they did it. Okay.  But at least from what I remember 20 years ago, when I worked with Posgescu somewhat more
+extensively, they did not have separate operators for full outer joints and insurance. But that might be the case
+today. Any questions on this?  All right, so let's uh, we'll stop a few minutes early today. just to recap what
+we're talking about today where selections, two, 3 different ways of doing selections, mainly 2 ways of doing
+selections. The sequentials can. And index index scan.  Both of them are commonly used in databases. You will see it
+in postvascular and most other databases that are similar. And then we saw a few different ways of doing joints.  So
+we saw the nested loops joint, which really only gets used very infrequently. If the relations are really small, we
+saw index nested loops joint, which is commonly used, and then we saw hash joint, which is the most commonly used
+for post rescue, and also other databases. What we haven't seen so far is the sword based joint, so that we'll talk
+about in the next class.  Okay. But before I stop, any questions on any of this? And just to remind you, the
+material till this point is on the quiz for next week.  Okay. So I believe it's on Thursday and I still forgot to
+check it. But then this is where whatever we cover in the next class, that's not on the quiz.  Any quick questions
+before we stop? Have you done over scheduling the one? Sorry.  Not yet. I'll try to do that today tomorrow, okay?
+We'll try to send that email out today.  All right, I'll see you on Tuesday.

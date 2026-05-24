@@ -1,0 +1,25 @@
+# Install the Whisper library and ffmpeg for audio processing
+!pip install git+https://github.com/openai/whisper.git 
+!apt install ffmpeg
+
+import whisper
+
+# Load the 'turbo' model (fastest high-accuracy model in 2026)
+# Or use 'large-v3' for maximum precision
+model = whisper.load_model("turbo")
+
+# Run the transcription
+result2 = model.transcribe("lecture-tuesday-april-7-2026.mp3")
+# Print the text
+print(result2["text"])
+# Save to a text file
+with open("transcript2.txt", "w") as f:    
+       f.write(result2["text"])
+
+# Run the transcription
+result3 = model.transcribe("lecture-thursday-april-9-2026.m4a")
+# Print the text
+print(result3["text"])
+# Save to a text file
+with open("transcript3.txt", "w") as f:    
+      f.write(result3["text"])

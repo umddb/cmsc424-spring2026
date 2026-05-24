@@ -1,0 +1,80 @@
+select A, count(distinct B) 
+from R
+group by A
+
+
+A, B
+1, b1
+1, b2
+1, b4
+2, b3
+2, b5
+3, b2
+
+
+HASH TABLE
+
+- first tuple 
+
+1: [(1, b1)]
+
+- second tuple 
+1: [(1, b1)]
+2: [(2, b3)]
+
+- third tuple 
+1: [(1, b1), (1, b2)]
+2: [(2, b3)]
+
+- fourth tuple 
+1: [(1, b1), (1, b2)]   --- 1: count = 2, sum = b1+b2, max = max(b1, b2), min = min(b1, b2), l = set(b1, b2)
+2: [(2, b3)]            --- 2: 1
+3: [(3, b2)]            --- 3: 1
+
+- fifth tuple 
+1: [(1, b1), (1, b2), (1, b4)]
+2: [(2, b3)]
+3: [(3, b2)]
+
+- sixth tuple 
+1: [(1, b1), (1, b2), (1, b4)]
+2: [(2, b3), (2, b5)]
+3: [(3, b2)]
+
+AT THE END
+
+go through the hash table
+output: (1, 3), (2, 2), (3, 1)
+
+
+
+
+R (A, B)
+1, b2
+2, b3
+1, b3
+
+S (B, C)
+b1, 2
+b2, 3
+b1, 3
+
+
+
+S is too large and we need to sort it
+
+---- partitioning: option 1
+S1 = partition of S where B < b500
+S2 = partition of S where b501 < B < b1000
+S3 = partition of S where b1001 < B < b1500
+S4 = partition of S where b1501 < B 
+
+--- option 2:
+
+-- Read as much of S in memory as possible; qsort; write out to disk as S1 (sorted run)
+-- Read as much of S in memory as possible; qsort; write out to disk as S2 (sorted run)
+-- Read as much of S in memory as possible; qsort; write out to disk as S3 (sorted run)
+-- Read as much of S in memory as possible; qsort; write out to disk as S4 (sorted run)
+
+
+-- MERGE S1, S2, S3, S4
